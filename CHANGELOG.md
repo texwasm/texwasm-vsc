@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Prompt to enable `texwasm.includeExtraBundle` when a CTAN package download fails.
+- Link to GitHub releases shown if the download of engine assets fails.
+- `with-assets.vsix` GitHub release asset as a fallback in case the asset download fails.
+
 ## [0.1.0] - 2026-08-09
 
 ### Added
