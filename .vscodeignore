@@ -1,0 +1,9 @@
+.git/**
+.github/**
+.vscode/**
+.vscode-test/**
+test/**
+dist/test/**
+assets/**
+**/*.map
+*.vsix

@@ -1,0 +1,4 @@
+{
+	"engineBaseUrl": "https://github.com/TeXlyre/texlyre-busytex-build/releases/download/build_wasm_da0856b603aa29a52e3abfe76df8a801bbf47082_28685970223_1",
+	"biber": "https://github.com/TeXWASM/TeXWASM-biber/releases/download/1.0.0/biber-1.0.0-wasm.tar.gz"
+}

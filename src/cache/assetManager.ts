@@ -4,13 +4,14 @@ import * as path from "node:path";
 import * as zlib from "node:zlib";
 import * as tar from "tar";
 import * as vscode from "vscode";
-import { getAssetsDir, getBiberDir } from "./storage";
-
-const ASSET_BASE_URL =
-	"https://github.com/TeXlyre/texlyre-busytex-build/releases/download/build_wasm_da0856b603aa29a52e3abfe76df8a801bbf47082_28685970223_1";
-
-const BIBER_DOWNLOAD_URL =
-	"https://github.com/TeXWASM/TeXWASM-biber/releases/download/1.0.0/biber-1.0.0-wasm.tar.gz";
+import {
+	getAssetsDir,
+	getBiberDir,
+	resolveAssetPath,
+	resolveAssetsDir,
+	resolveBiberPath,
+} from "./storage";
+import assetUrls from "./assetUrls.json";
 
 const BASE_ASSETS = ["busytex.js", "busytex.wasm", "texlive-basic.js", "texlive-basic.data"];
 
@@ -87,7 +88,7 @@ export class AssetManager {
 	}
 
 	get assetsDir(): string {
-		return getAssetsDir(this.context);
+		return resolveAssetsDir(this.context);
 	}
 
 	get biberDir(): string {
@@ -103,14 +104,14 @@ export class AssetManager {
 	}
 
 	isDownloaded(): boolean {
-		return this.requiredAssets.every((file) =>
-			fs.existsSync(path.join(this.assetsDir, file)),
+		return this.requiredAssets.every(
+			(file) => resolveAssetPath(this.context, file) !== undefined,
 		);
 	}
 
 	biberDownloaded(): boolean {
-		return BIBER_FILES.some((file) =>
-			fs.existsSync(path.join(this.biberDir, file)),
+		return BIBER_FILES.some(
+			(file) => resolveBiberPath(this.context, file) !== undefined,
 		);
 	}
 
@@ -151,7 +152,7 @@ export class AssetManager {
 						fs.mkdirSync(this.biberDir, { recursive: true });
 					}
 
-					const buffer = await downloadToBuffer(BIBER_DOWNLOAD_URL);
+					const buffer = await downloadToBuffer(assetUrls.biber);
 
 					if (token.isCancellationRequested) return false;
 
@@ -183,8 +184,9 @@ export class AssetManager {
 		token: vscode.CancellationToken,
 	): Promise<boolean> {
 		try {
-			if (!fs.existsSync(this.assetsDir)) {
-				fs.mkdirSync(this.assetsDir, { recursive: true });
+			const downloadDir = getAssetsDir(this.context);
+			if (!fs.existsSync(downloadDir)) {
+				fs.mkdirSync(downloadDir, { recursive: true });
 			}
 
 			const assets = this.requiredAssets;
@@ -195,7 +197,7 @@ export class AssetManager {
 					return false;
 				}
 
-				const destPath = path.join(this.assetsDir, file);
+				const destPath = path.join(downloadDir, file);
 				if (fs.existsSync(destPath)) {
 					progress.report({
 						message: `${file} (already cached)`,
@@ -222,7 +224,7 @@ export class AssetManager {
 	}
 
 	private downloadFile(filename: string, destPath: string): Promise<void> {
-		const url = `${ASSET_BASE_URL}/${filename}`;
+		const url = `${assetUrls.engineBaseUrl}/${filename}`;
 		return downloadFile(url, destPath);
 	}
 }

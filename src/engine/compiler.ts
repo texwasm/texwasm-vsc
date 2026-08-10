@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 import type * as vscode from "vscode";
-import { getBiberDir } from "../cache/storage";
+import { resolveAssetsDir, resolveBiberDir } from "../cache/storage";
 import { getIncludeExtraBundle } from "../config/settings";
 import { appendLog } from "../output/outputChannel";
 import type {
@@ -33,22 +33,11 @@ export class Compiler {
 	}
 
 	get assetsDir(): string {
-		const globalPath = path.join(
-			this.context.globalStorageUri.fsPath,
-			"assets",
-		);
-		if (fs.existsSync(path.join(globalPath, "busytex.js"))) {
-			return globalPath;
-		}
-		const devPath = path.join(this.context.extensionPath, "assets", "busytex");
-		if (fs.existsSync(path.join(devPath, "busytex.js"))) {
-			return devPath;
-		}
-		return globalPath;
+		return resolveAssetsDir(this.context);
 	}
 
 	get biberAssetsDir(): string {
-		return getBiberDir(this.context);
+		return resolveBiberDir(this.context);
 	}
 
 	assetsReady(): boolean {

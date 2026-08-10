@@ -37,7 +37,7 @@ async function concurrentPool<T, R>(
 	await Promise.allSettled(executing);
 	return results;
 }
-import { getAssetsDir, getPackageCacheDir } from "./storage";
+import { getPackageCacheDir, resolveAssetPath } from "./storage";
 
 // Shared with wasmWorker.ts (duplicated to avoid cross-module dependency)
 function extractBalanced(
@@ -253,20 +253,6 @@ export class PackageCache {
 		}
 	}
 
-	/** Find an asset file, mirroring Compiler.assetsDir (globalStorage → bundled dev assets). */
-	private resolveAssetPath(fileName: string): string | undefined {
-		const globalPath = path.join(getAssetsDir(this.context), fileName);
-		if (fs.existsSync(globalPath)) return globalPath;
-		const devPath = path.join(
-			this.context.extensionPath,
-			"assets",
-			"busytex",
-			fileName,
-		);
-		if (fs.existsSync(devPath)) return devPath;
-		return undefined;
-	}
-
 	/** Lazily populate the preloadedPackages and preloadedDefFiles sets from downloaded asset bundles.
 	 *  Only bundles that are actually loaded into the WASM filesystem count:
 	 *  texlive-basic is always loaded; texlive-extra only when includeExtraBundle is enabled. */
@@ -281,7 +267,7 @@ export class PackageCache {
 		}
 
 		for (const jsFile of jsFiles) {
-			const jsPath = this.resolveAssetPath(jsFile);
+			const jsPath = resolveAssetPath(this.context, jsFile);
 			if (!jsPath) continue;
 			try {
 				const info = parsePreloadFile(jsPath);

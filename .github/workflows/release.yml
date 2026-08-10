@@ -34,15 +34,35 @@ jobs:
       - name: Build extension
         run: npm run compile
 
-      - name: Package extension
+      - name: Package extension (without assets)
         run: npm run package
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" texwasm-*.vsix -F release-notes.md
 
       - name: Publish to VS Code Marketplace
         env:
           TEXWASM_VSCE_TOKEN: ${{ secrets.TEXWASM_VSCE_TOKEN }}
         run: vsce publish -p "$TEXWASM_VSCE_TOKEN"
+
+      - name: Download WASM assets
+        run: |
+          ASSET_BASE_URL="$(node -p "require('./src/cache/assetUrls.json').engineBaseUrl")"
+          BIBER_URL="$(node -p "require('./src/cache/assetUrls.json').biber")"
+          mkdir -p assets/busytex
+          for f in busytex.js busytex.wasm texlive-basic.js texlive-basic.data texlive-extra.js texlive-extra.data; do
+            curl -fL "$ASSET_BASE_URL/$f" -o "assets/busytex/$f"
+          done
+          curl -fL "$BIBER_URL" -o /tmp/biber.tar.gz
+          mkdir -p assets/biber
+          tar -xzf /tmp/biber.tar.gz -C assets/biber
+
+      - name: Package extension (with assets)
+        run: |
+          VER="$(node -p "require('./package.json').version")"
+          grep -v '^assets/' .vscodeignore > .vscodeignore.tmp
+          mv .vscodeignore.tmp .vscodeignore
+          vsce package --out "texwasm-${VER}-with-assets.vsix"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run:
+          gh release create "$GITHUB_REF_NAME" "texwasm-*.vsix" -F release-notes.md
