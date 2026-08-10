@@ -3,8 +3,9 @@ import assert from 'node:assert';
 import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as pkg from '../../package.json';
 
-const extensionId = 'texwasm.texwasm';
+const extensionId = pkg.publisher + '.' + pkg.name;
 
 describe('TeXWASM Compilation', function () {
   this.timeout(600_000);

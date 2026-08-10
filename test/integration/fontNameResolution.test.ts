@@ -3,8 +3,9 @@ import assert from "node:assert";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import * as pkg from '../../package.json';
 
-const extensionId = "texwasm.texwasm";
+const extensionId = pkg.publisher + '.' + pkg.name;
 
 /**
  * Font name + an expected absolute path. We pick the first one that exists

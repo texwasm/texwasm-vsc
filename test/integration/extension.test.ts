@@ -1,8 +1,9 @@
 import { describe, it, before, after } from 'mocha';
 import assert from 'node:assert';
 import * as vscode from 'vscode';
+import * as pkg from '../../package.json';
 
-const extensionId = 'texwasm.texwasm';
+const extensionId = pkg.publisher + '.' + pkg.name;
 
 describe('TeXWASM Extension', () => {
   let extension: vscode.Extension<unknown> | undefined;
