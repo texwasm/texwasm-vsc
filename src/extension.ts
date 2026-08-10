@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { AssetManager } from "./cache/assetManager";
+import { AssetManager, showAssetDownloadError } from "./cache/assetManager";
 import { PackageCache } from "./cache/packageCache";
 import { cleanAuxiliaryFiles } from "./commands/clean";
 import {
@@ -77,21 +77,22 @@ export function activate(context: vscode.ExtensionContext): void {
 		},
 	);
 
-	const downloadEngineCmd = vscode.commands.registerCommand(
-		"texwasm.downloadEngine",
-		async () => {
-			const assetManager = new AssetManager(context);
-			const result = await assetManager.ensureAssets();
-			const biberResult = await assetManager.ensureBiber();
-			if (result && biberResult) {
-				vscode.window.showInformationMessage("TeXWASM: Engine assets ready.");
-			} else {
-				const msg = "TeXWASM: Failed to download engine assets.";
-				vscode.window.showErrorMessage(msg);
-				throw new Error(msg);
-			}
-		},
-	);
+		const downloadEngineCmd = vscode.commands.registerCommand(
+			"texwasm.downloadEngine",
+			async () => {
+				const assetManager = new AssetManager(context);
+				const result = await assetManager.ensureAssets();
+				const biberResult = await assetManager.ensureBiber();
+				if (result && biberResult) {
+					vscode.window.showInformationMessage("TeXWASM: Engine assets ready.");
+				} else {
+					await showAssetDownloadError(
+						"Failed to download engine assets.",
+					);
+					throw new Error("Failed to download engine assets.");
+				}
+			},
+		);
 
 	const clearPkgCacheCmd = vscode.commands.registerCommand(
 		"texwasm.clearPackageCache",
@@ -162,8 +163,8 @@ export function activate(context: vscode.ExtensionContext): void {
 				const assetManager = new AssetManager(context);
 				assetManager.ensureAssets().then((ok) => {
 					if (!ok) {
-						vscode.window.showErrorMessage(
-							"TeXWASM: Failed to download the texlive-extra bundle. Run 'TeXWASM: Download/Update Engine' to retry.",
+						showAssetDownloadError(
+							"Failed to download the texlive-extra bundle.",
 						);
 					}
 				});

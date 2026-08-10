@@ -12,6 +12,7 @@ import {
 	resolveBiberPath,
 } from "./storage";
 import assetUrls from "./assetUrls.json";
+import * as pkg from "../../package.json";
 
 const BASE_ASSETS = ["busytex.js", "busytex.wasm", "texlive-basic.js", "texlive-basic.data"];
 
@@ -21,6 +22,24 @@ const BIBER_FILES = ["biber_wasm.js", "biber_wasm_bg.wasm", "biber_wasm.d.ts", "
 
 function getRequiredAssets(includeExtra: boolean): string[] {
 	return includeExtra ? [...BASE_ASSETS, ...EXTRA_ASSETS] : BASE_ASSETS;
+}
+
+const GITHUB_RELEASES_URL = `${pkg.repository.url}/releases`;
+
+/**
+ * Show an error when WASM assets could not be downloaded and direct the user to
+ * the pre-bundled alternative: the '*-with-assets.vsix' file produced by the
+ * release workflow (see .github/workflows/release.yml) on the GitHub releases
+ * page, which ships the assets inside the extension itself.
+ */
+export async function showAssetDownloadError(detail: string): Promise<void> {
+	const action = await vscode.window.showErrorMessage(
+		`TeXWASM: ${detail} If the download is not possible, install the '*-with-assets.vsix' file from the GitHub releases page instead \u2014 it bundles the WASM assets with the extension.`,
+		"Open GitHub Releases",
+	);
+	if (action === "Open GitHub Releases") {
+		await vscode.env.openExternal(vscode.Uri.parse(GITHUB_RELEASES_URL));
+	}
 }
 
 function downloadFile(url: string, destPath: string): Promise<void> {
@@ -168,8 +187,8 @@ export class AssetManager {
 
 					return true;
 				} catch (err) {
-					vscode.window.showErrorMessage(
-						`TeXWASM: Failed to download biber: ${err instanceof Error ? err.message : String(err)}`,
+					await showAssetDownloadError(
+						`Failed to download biber WASM: ${err instanceof Error ? err.message : String(err)}`,
 					);
 					return false;
 				}
@@ -216,8 +235,8 @@ export class AssetManager {
 
 			return true;
 		} catch (err) {
-			vscode.window.showErrorMessage(
-				`TeXWASM: Failed to download engine assets: ${err instanceof Error ? err.message : String(err)}`,
+			await showAssetDownloadError(
+				`Failed to download engine assets: ${err instanceof Error ? err.message : String(err)}`,
 			);
 			return false;
 		}

@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { AssetManager } from "../cache/assetManager";
+import { AssetManager, showAssetDownloadError } from "../cache/assetManager";
 import type { PackageCache } from "../cache/packageCache";
 import {
 	getAutoDownloadPackages,
@@ -244,8 +244,8 @@ export async function compileDocument(
 	const assetsReady = await assetManager.ensureAssets();
 	if (!assetsReady) {
 		onStatusChange?.("error");
-		vscode.window.showErrorMessage(
-			"TeXWASM: Engine assets not available. Run 'TeXWASM: Download/Update Engine'.",
+		await showAssetDownloadError(
+			"Engine assets are not available.",
 		);
 		return;
 	}
@@ -327,7 +327,7 @@ export async function compileDocument(
 		const biberReady = await assetManager.ensureBiber();
 		if (!biberReady) {
 			onStatusChange?.("error");
-			vscode.window.showErrorMessage("TeXWASM: Biber WASM assets not available.");
+			await showAssetDownloadError("Biber WASM assets are not available.");
 			return;
 		}
 	}
