@@ -29,6 +29,9 @@ export function activate(context: vscode.ExtensionContext): void {
 	const compiler = new Compiler(context);
 	const pkgCache = new PackageCache(context);
 	pkgCache.setDocstripHandler((files) => compiler.docstrip(files));
+	pkgCache.setExtraBundlePromptHandler(() => {
+		void promptEnableExtraBundle();
+	});
 
 	setCompiler(compiler);
 	setPackageCache(pkgCache);
@@ -195,6 +198,22 @@ export function deactivate(): void {
 	clearDiagnostics();
 	disposeOutputChannel();
 	appendLog("[TeXWASM] Extension deactivated.");
+}
+
+/** When a CTAN package download fails while the texlive-extra bundle is
+ *  disabled, ask the user whether to enable texwasm.includeExtraBundle:
+ *  the extra bundle preloads far more packages, so on-demand CTAN downloads
+ *  (which just failed) are rarely needed. */
+async function promptEnableExtraBundle(): Promise<void> {
+	const action = await vscode.window.showWarningMessage(
+		"TeXWASM: Could not download a package from CTAN. Enabling 'texwasm.includeExtraBundle' preloads many more packages and avoids CTAN downloads.",
+		"Enable includeExtraBundle",
+	);
+	if (action !== "Enable includeExtraBundle") return;
+
+	await vscode.workspace
+		.getConfiguration("texwasm")
+		.update("includeExtraBundle", true, vscode.ConfigurationTarget.Global);
 }
 
 function updateStatusBar(state: StatusState): void {

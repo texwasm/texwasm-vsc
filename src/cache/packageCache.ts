@@ -70,6 +70,10 @@ function extractBalanced(
 const TEX_LIVE_MOUNT = "/texlive/texmf-dist";
 const PACKAGE_CACHE_METADATA = "metadata.json";
 
+/** Prevents nagging the user with the "enable includeExtraBundle" prompt more
+ *  than once per session when several CTAN downloads fail in a row. */
+let extraBundlePromptShown = false;
+
 /** Extensions worth persisting from a docstrip run (mirrors MOUNTABLE_EXTENSIONS in wasmWorker). */
 const DOCSTRIP_KEEP_EXTENSIONS = new Set([
 	".sty",
@@ -234,6 +238,10 @@ export class PackageCache {
 	/** Whether the texlive-extra bundle will be loaded into the WASM filesystem */
 	private includeExtraBundle = false;
 
+	/** Injected by extension.ts; prompts the user to enable texwasm.includeExtraBundle.
+	 *  Kept out of this module so PackageCache stays testable without the vscode module. */
+	private extraBundlePromptHandler: (() => void) | null = null;
+
 	constructor(context: vscode.ExtensionContext) {
 		this.context = context;
 	}
@@ -241,6 +249,12 @@ export class PackageCache {
 	/** Inject the docstrip handler (provided by the Compiler, which owns the WASM worker). */
 	setDocstripHandler(handler: DocstripHandler): void {
 		this.docstripHandler = handler;
+	}
+
+	/** Inject a handler that asks the user to enable texwasm.includeExtraBundle
+	 *  (called when a CTAN download fails while the extra bundle is disabled). */
+	setExtraBundlePromptHandler(handler: () => void): void {
+		this.extraBundlePromptHandler = handler;
 	}
 
 	/** Must reflect the texwasm.includeExtraBundle setting so preload checks match reality. */
@@ -251,6 +265,16 @@ export class PackageCache {
 			this.preloadedPackages = null;
 			this.preloadedDefFiles = null;
 		}
+	}
+
+	/** When a CTAN package download fails and the texlive-extra bundle is
+	 *  disabled, ask the user whether to enable texwasm.includeExtraBundle:
+	 *  the extra bundle preloads far more packages, so on-demand CTAN
+	 *  downloads (which just failed) are rarely needed. */
+	private promptEnableExtraBundle(): void {
+		if (this.includeExtraBundle || extraBundlePromptShown) return;
+		extraBundlePromptShown = true;
+		this.extraBundlePromptHandler?.();
 	}
 
 	/** Lazily populate the preloadedPackages and preloadedDefFiles sets from downloaded asset bundles.
@@ -549,6 +573,7 @@ export class PackageCache {
 		}
 		if (extractedFiles.length === 0) {
 			progress?.(`Could not download '${packageName}' from CTAN.`);
+			this.promptEnableExtraBundle();
 			return [];
 		}
 
