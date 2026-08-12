@@ -101,7 +101,7 @@ function discoverDocstripGuards(
 	packageName: string,
 ): string[] {
 	const pkgLower = packageName.toLowerCase();
-	const guardRegex = /^%\*<\+?([\w-]+)>/gm;
+	const guardRegex = /^%<\*\+?([\w-]+)>/gm;
 	const allGuards = new Set<string>();
 	let m: RegExpExecArray | null;
 	while ((m = guardRegex.exec(dtxContent)) !== null) {
@@ -138,20 +138,84 @@ function discoverDocstripGuards(
 	return ["package", "package-new"];
 }
 
-/** Build a synthetic docstrip driver .ins that loads docstrip.tex and
- *  \generate\file{pkg.sty}\from{pkg.dtx}{guards}. */
-function makeSyntheticIns(
+interface InstallFileMapping {
+	fileName: string;
+	guards: string[];
+}
+
+/** Files a .dtx install driver may generate that are not package code
+ *  (.ins install scripts, .drv documentation drivers). */
+const INSTALL_SKIP_EXTENSIONS = new Set([".ins", ".drv"]);
+
+/**
+ * Parse a .dtx's embedded install driver (the `%<*install>` … `%</install>`
+ * section) for its `\file{NAME}{\from{DTX}{guards}}` mappings. Many CTAN
+ * packages (e.g. pdflscape) ship no standalone .ins but embed one in the .dtx;
+ * that driver can map guards to *multiple* output files (pdflscape.sty from
+ * `package-new` plus pdflscape-nometadata.sty from `package`), which the
+ * generic guard heuristic below cannot express. Returns null when the .dtx has
+ * no usable install driver. Exported for unit testing.
+ */
+export function parseInstallDriver(
+	dtxContent: string,
+	dtxBase: string,
+): InstallFileMapping[] | null {
+	const section = dtxContent.match(/^%<\*install>([\s\S]*?)^%<\/install>/m)?.[1];
+	if (!section) return null;
+
+	const mappings: InstallFileMapping[] = [];
+	const fileRe = /\\file\{([^}]+)\}\{\\from\{([^}]+)\}\{([^}]*)\}\}/g;
+	let m: RegExpExecArray | null;
+	while ((m = fileRe.exec(section)) !== null) {
+		const fileName = m[1];
+		const fromBase = path.basename(m[2]);
+		if (fromBase.toLowerCase() !== dtxBase.toLowerCase()) continue;
+		if (INSTALL_SKIP_EXTENSIONS.has(path.extname(fileName).toLowerCase())) continue;
+		const guards = m[3]
+			.split(",")
+			.map((g) => g.trim())
+			.filter(Boolean);
+		if (guards.length === 0) continue;
+		mappings.push({ fileName, guards });
+	}
+
+	return mappings.length > 0 ? mappings : null;
+}
+
+/**
+ * Build a synthetic docstrip driver .ins that loads docstrip.tex and runs
+ * \generate. When the .dtx embeds an install driver (e.g. pdflscape), the
+ * driver's own `\file{…}{\from{…}{…}}` mappings are reproduced so every output
+ * file is generated under its correct name and guards. Otherwise fall back to
+ * the generic heuristic that writes a single {pkgName}.sty from the discovered
+ * guards. Exported for unit testing.
+ */
+export function makeSyntheticIns(
 	dtxBase: string,
 	packageName: string,
 	dtxContent: string,
 ): string {
-	const guards = discoverDocstripGuards(dtxContent, packageName);
-	const guardList = guards.join(",");
+	const mappings = parseInstallDriver(dtxContent, dtxBase);
+	const generateLines: string[] = [];
+	if (mappings) {
+		for (const f of mappings) {
+			generateLines.push(
+				`  \\file{${f.fileName}}{\\from{${dtxBase}}{${f.guards.join(",")}}}%`,
+			);
+		}
+	} else {
+		const guards = discoverDocstripGuards(dtxContent, packageName);
+		generateLines.push(
+			`  \\file{${packageName}.sty}{\\from{${dtxBase}}{${guards.join(",")}}}%`,
+		);
+	}
 	return [
 		"\\input docstrip.tex",
 		"\\keepsilent",
 		"\\askforoverwritefalse",
-		`\\generate{\\file{${packageName}.sty}{\\from{${dtxBase}}{${guardList}}}}`,
+		"\\generate{%",
+		...generateLines,
+		"}",
 		"\\endinput",
 	].join("\n");
 }
@@ -438,7 +502,35 @@ export class PackageCache {
 			(f) => /\.dtx$/i.test(f) && !insFiles.some((i) => i.replace(/\.ins$/i, ".dtx").toLowerCase() === f.toLowerCase()),
 		);
 
-		if (hasSty || (insFiles.length === 0 && dtxFiles.length === 0)) return;
+		// Files the dtx install drivers are expected to produce (e.g. pdflscape
+		// generates both pdflscape.sty and pdflscape-nometadata.sty). If any of
+		// them is missing from the cache — e.g. a stale cache built by merging all
+		// guards into a single .sty — regeneration must run even when some .sty
+		// already exists, otherwise pdflapse would keep failing on the missing
+		// pdflscape-nometadata.sty.
+		const expectedGenerated = new Set<string>();
+		for (const dtx of dtxFiles) {
+			let dtxContent = "";
+			try {
+				dtxContent = fs.readFileSync(path.join(dir, dtx), "utf-8");
+			} catch {
+				continue;
+			}
+			const mappings = parseInstallDriver(dtxContent, path.basename(dtx));
+			if (!mappings) continue;
+			for (const f of mappings) expectedGenerated.add(f.fileName.toLowerCase());
+		}
+		const missingExpected = [...expectedGenerated].filter((name) => {
+			const rel = meta.files.find((f) => path.basename(f).toLowerCase() === name);
+			return !rel || !fs.existsSync(path.join(dir, rel));
+		});
+
+		if (
+			(hasSty && missingExpected.length === 0) ||
+			(insFiles.length === 0 && dtxFiles.length === 0)
+		) {
+			return;
+		}
 
 		const inputFiles: { path: string; content: Uint8Array }[] = [];
 		const inputNames = new Set<string>();

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Docstrip generation for CTAN packages whose embedded install driver maps guards to multiple files (e.g. `pdflscape`, which ships both `pdflscape.sty` and `pdflscape-nometadata.sty`). Previously all guards were merged into a single `.sty`, so `\RequirePackage{pdflscape-nometadata}` failed and compilation aborted.
+
 ## [0.2.0] - 2026-08-12
 
 ### Added
