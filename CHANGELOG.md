@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - Docstrip generation for CTAN packages whose embedded install driver maps guards to multiple files (e.g. `pdflscape`, which ships both `pdflscape.sty` and `pdflscape-nometadata.sty`). Previously all guards were merged into a single `.sty`, so `\RequirePackage{pdflscape-nometadata}` failed and compilation aborted.
+- CTAN packages that ship no prebuilt main `.sty` (only `.dtx`/`.ins` sources) no longer skip docstrip when the bundle contains an unrelated `.sty` (e.g. `eso-pic`, which ships `showframe.sty`). Previously the main `.sty` was never generated and the unrelated file was aliased as the package's, so `\usepackage{eso-pic}` resolved to a file providing `showframe`, leaving `\AddToShipoutPictureFG` undefined and breaking the first page of documents compiled with `texwasm.includeExtraBundle: false`. The `{packageName}.sty` alias now only points at a `.sty` whose name is related to the package (e.g. `tabulary-v010.sty` → `tabulary.sty`).
 
 ## [0.2.0] - 2026-08-12
 

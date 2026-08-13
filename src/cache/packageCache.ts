@@ -402,7 +402,7 @@ export class PackageCache {
 
 		const meta: CachedPackage = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
 		const entries: MountEntry[] = [];
-		let firstStyContent: Uint8Array | undefined;
+		const styCandidates: { name: string; content: Uint8Array }[] = [];
 
 		for (const filePath of meta.files) {
 			const absPath = path.join(dir, filePath);
@@ -423,23 +423,36 @@ export class PackageCache {
 
 			entries.push({ targetPath, content });
 
-			// Track the first .sty file content for potential alias
-			if (filePath.endsWith(".sty") && !firstStyContent) {
-				firstStyContent = content;
+			if (filePath.endsWith(".sty")) {
+				styCandidates.push({ name: filePath, content });
 			}
 		}
 
 		// If no .sty file is named {packageName}.sty, create an alias entry
-		// so \usepackage{packageName} can find it (e.g. tabulary-v010.sty → tabulary.sty)
+		// so \usepackage{packageName} can find it (e.g. tabulary-v010.sty → tabulary.sty).
+		// Only alias from a .sty whose name is related to the package (versioned
+		// names like tabulary-v010.sty); never from an unrelated .sty shipped in
+		// the same bundle (e.g. showframe.sty inside eso-pic), whose content would
+		// silently masquerade as {packageName}.sty.
 		const expectedSty = `${packageName}.sty`;
 		const hasExact = entries.some(
 			(e) => path.posix.basename(e.targetPath) === expectedSty,
 		);
-		if (firstStyContent && !hasExact) {
-			entries.push({
-				targetPath: `${TEX_LIVE_MOUNT}/${expectedSty}`,
-				content: firstStyContent,
+		if (!hasExact) {
+			const aliasPkg = packageName.toLowerCase();
+			const aliasSource = styCandidates.find((c) => {
+				const base = path
+					.posix
+					.basename(c.name, path.posix.extname(c.name))
+					.toLowerCase();
+				return base.startsWith(aliasPkg) || aliasPkg.startsWith(base);
 			});
+			if (aliasSource) {
+				entries.push({
+					targetPath: `${TEX_LIVE_MOUNT}/${expectedSty}`,
+					content: aliasSource.content,
+				});
+			}
 		}
 
 		return entries;
@@ -493,7 +506,17 @@ export class PackageCache {
 			return;
 		}
 
-		const hasSty = meta.files.some((f) => /\.(sty|cls)$/i.test(f));
+		const pkgLower = packageName.toLowerCase();
+		// Only the package's own main file ({pkg}.sty / {pkg}.cls) counts as
+		// "the package code has been built". Unrelated .sty files that ship
+		// inside the same bundle (e.g. showframe.sty ships with eso-pic) must
+		// NOT suppress docstrip for the missing main .sty — otherwise
+		// \usepackage{eso-pic} would resolve to a file that provides showframe
+		// and every page relying on eso-pic's shipout hooks breaks.
+		const hasMainSty = meta.files.some((f) => {
+			const base = path.basename(f).toLowerCase();
+			return base === `${pkgLower}.sty` || base === `${pkgLower}.cls`;
+		});
 		const insFiles = meta.files.filter((f) => /\.ins$/i.test(f));
 		// DTX files without a matching .ins (e.g. pdflscape) often embed their
 		// own install driver gated on \let\install=y. We synthesize a tiny
@@ -526,7 +549,7 @@ export class PackageCache {
 		});
 
 		if (
-			(hasSty && missingExpected.length === 0) ||
+			(hasMainSty && missingExpected.length === 0) ||
 			(insFiles.length === 0 && dtxFiles.length === 0)
 		) {
 			return;
