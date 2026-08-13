@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Engine asset downloads now use the [TeXWASM BusyTeX Mirror](https://github.com/texwasm/texlyre-busytex-mirror) release feed instead of the upstream TeXlyre build releases.
+
 ### Fixed
 
 - Docstrip generation for CTAN packages whose embedded install driver maps guards to multiple files (e.g. `pdflscape`, which ships both `pdflscape.sty` and `pdflscape-nometadata.sty`). Previously all guards were merged into a single `.sty`, so `\RequirePackage{pdflscape-nometadata}` failed and compilation aborted.
