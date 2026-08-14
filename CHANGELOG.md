@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- "Querying CTAN for..." progress messages were shown even when the CTAN API was not called because package info was already resolved in memory. The query message now only appears for real CTAN API calls; packages served from the cache no longer print a misleading message.
+
 ## [0.3.0] - 2026-08-14
 
 ### Added

@@ -473,12 +473,18 @@ export class PackageCache {
 		return Array.from(map.values());
 	}
 
-	/** Query CTAN API and cache package info */
-	async resolvePackage(packageName: string): Promise<CtanPackageInfo | null> {
+	/** Query CTAN API and cache package info. Only emits a progress message when
+	 *  CTAN is actually called; info already resolved this session is served from
+	 *  the in-memory cache without touching the network. */
+	async resolvePackage(
+		packageName: string,
+		progress?: (msg: string) => void,
+	): Promise<CtanPackageInfo | null> {
 		if (this.resolvedInfo.has(packageName)) {
 			return this.resolvedInfo.get(packageName) as CtanPackageInfo;
 		}
 
+		progress?.(`Querying CTAN for package '${packageName}'...`);
 		const info = await queryPackageInfo(packageName);
 		this.resolvedInfo.set(packageName, info);
 		return info;
@@ -644,9 +650,9 @@ export class PackageCache {
 			return [];
 		}
 
-		// Query CTAN API
-		progress?.(`Querying CTAN for package '${packageName}'...`);
-		const info = await this.resolvePackage(packageName);
+		// Resolve package info (only emits a "Querying CTAN" message when CTAN
+		// is actually called, not when info is served from the in-memory cache)
+		const info = await this.resolvePackage(packageName, progress);
 		if (!info) {
 			console.log(`[DEBUG] ${packageName}: no info from CTAN API`);
 			return [];
