@@ -215,8 +215,8 @@
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit",
     "test": "npm run compile && npm run compile-test && node dist/test/runTest.js",
-    "test:unit": "mocha",
-    "package": "vsce package",
+    "test:unit": "npm run compile && mocha",
+    "package": "npm run compile && vsce package",
     "clean": "rimraf dist .vscode-test"
   },
   "devDependencies": {

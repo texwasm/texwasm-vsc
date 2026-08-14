@@ -31,10 +31,7 @@ jobs:
             s
           ' CHANGELOG.md > release-notes.md
 
-      - name: Build extension
-        run: npm run compile
-
-      - name: Package extension (without assets)
+      - name: Build and package extension (without assets)
         run: npm run package
 
       - name: Publish to VS Code Marketplace
