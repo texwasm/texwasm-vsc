@@ -22,6 +22,7 @@ import type { Compiler } from "../engine/compiler";
 import { resolveProjectFiles } from "../engine/fileResolver";
 import {
 	buildFontIndex,
+	extractMacroDefinitions,
 	mergeFontIndices,
 	resolveFontReferences,
 } from "../engine/fontResolver";
@@ -391,12 +392,24 @@ export async function compileDocument(
 		}
 		const fontIndex = mergeFontIndices(workspaceIndex, systemIndex);
 
+		// Collect font-holding macros (\def\fontType{Arial}, \newcommand\fontType{Arial})
+		// from the root document AND every included file so a font name stored in a
+		// variable resolves regardless of which file defines it.
+		const fontMacros = extractMacroDefinitions(sourceContent);
+		for (const pf of projectFiles) {
+			if (typeof pf.content !== "string") continue;
+			for (const [name, value] of extractMacroDefinitions(pf.content)) {
+				fontMacros.set(name, value);
+			}
+		}
+
 		if (fontIndex.size > 0) {
 			const result = resolveFontReferences(
 				sourceContent,
 				fontIndex,
 				{},
 				sourceDir,
+				fontMacros,
 			);
 			if (result.rewritten.length > 0) {
 				appendLog(
@@ -427,6 +440,7 @@ export async function compileDocument(
 					fontIndex,
 					{},
 					sourceDir,
+					fontMacros,
 				);
 				if (sub.rewritten.length === 0 && sub.unresolved.length === 0) return f;
 				allRewritten.push(...sub.rewritten);

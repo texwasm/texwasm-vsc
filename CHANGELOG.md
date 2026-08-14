@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Font name references now resolve when the font name is stored in a LaTeX variable (e.g. `\def \fontType {Arial}` followed by `\setmainfont{\fontType}`). Macro definitions are collected from the root document and every included file, so the definition may live in a different file than the `\setmainfont`/`\newfontfamily` call.
+
 ### Changed
 
 - Engine asset downloads now use the [TeXWASM BusyTeX Mirror](https://github.com/texwasm/texlyre-busytex-mirror) release feed instead of the upstream TeXlyre build releases.

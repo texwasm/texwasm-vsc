@@ -145,6 +145,76 @@ describe("TeXWASM font name resolution (lualatex)", function () {
 		);
 	});
 
+	it("resolves a font name stored in a macro defined in an included file", async function () {
+		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		if (!workspaceFolder) throw new Error("No workspace folder found");
+		const docDir = workspaceFolder.uri.fsPath;
+
+		const rootPath = path.join(docDir, "texwasm-font-macro-test.tex");
+		const defsPath = path.join(docDir, "texwasm-font-macro-defs.tex");
+		const rootPdfPath = rootPath.replace(/\.tex$/i, ".pdf");
+
+		// The font name lives in a variable defined in a separate included file:
+		//   defs.tex:  \def \fontType {Arial}
+		//   main.tex:  \input{defs} \setmainfont{\fontType}
+		fs.writeFileSync(defsPath, `\\def \\fontType {${fontChoice!.family}}\n`, "utf-8");
+		const rootContent = [
+			"% !TEX program = lualatex",
+			"\\documentclass{article}",
+			"\\usepackage{fontspec}",
+			"\\input{texwasm-font-macro-defs}",
+			"\\setmainfont{\\fontType}",
+			"",
+			"\\begin{document}",
+			"Hello from a macro-defined font!",
+			"\\end{document}",
+		].join("\n");
+		fs.writeFileSync(rootPath, rootContent, "utf-8");
+
+		const doc = await vscode.workspace.openTextDocument(rootPath);
+		await vscode.window.showTextDocument(doc);
+		assert.strictEqual(doc.languageId, "latex");
+
+		console.log(`[test] Compiling with macro-defined font: \\fontType = ${fontChoice!.family}`);
+		await vscode.commands.executeCommand("texwasm.compile");
+
+		let found = false;
+		for (let i = 0; i < 180; i++) {
+			if (fs.existsSync(rootPdfPath)) {
+				found = true;
+				break;
+			}
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+		}
+		assert.ok(found, "PDF should exist after compiling with a macro-defined font");
+
+		const stats = fs.statSync(rootPdfPath);
+		assert.ok(
+			stats.size >= 2 * 1024,
+			`PDF should be at least 2 KB (got ${stats.size} bytes)`,
+		);
+
+		// Clean up this test's artifacts
+		const base = rootPath.replace(/\.tex$/i, "");
+		for (const ext of [".tex", ".pdf", ".aux", ".log", ".out", ".synctex.gz", ".xdv"]) {
+			const p = base + ext;
+			if (fs.existsSync(p)) {
+				try {
+					fs.unlinkSync(p);
+				} catch {
+					/* ignore */
+				}
+			}
+		}
+		if (fs.existsSync(defsPath)) {
+			try {
+				fs.unlinkSync(defsPath);
+			} catch {
+				/* ignore */
+			}
+		}
+	});
+
 	after(function () {
 		const base = texPath?.replace(/\.tex$/i, "");
 		if (base) {

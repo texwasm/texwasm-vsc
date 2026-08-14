@@ -295,6 +295,67 @@ export function mergeFontIndices(
 	return merged;
 }
 
+/* ──────────────────────── Macro definition extraction ──────────────────────── */
+
+/**
+ * Captures LaTeX control-sequence definitions whose replacement text is a
+ * simple (brace-delimited) value, e.g.:
+ *   \def \fontType {Arial}
+ *   \newcommand\fontType{Arial}
+ *   \newcommand{\fontType}{Arial}
+ *   \providecommand*{\fontType}{Arial}
+ * Capture groups: 1 = \def-style name, 2 = \def-style value,
+ * 3 = braced \newcommand-style name, 4 = unbraced \newcommand-style name,
+ * 5 = \newcommand-style value.
+ */
+const MACRO_DEFINITION_PATTERN = new RegExp(
+	`\\\\(?:def|gdef|edef|xdef)\\s*\\\\?([a-zA-Z@]+)\\s*\\{([^{}]*)\\}|` +
+		`\\\\(?:newcommand|renewcommand|providecommand|DeclareRobustCommand)\\*?\\s*(?:\\{\\\\([a-zA-Z@]+)\\}|\\\\([a-zA-Z@]+))\\s*(?:\\[[^\\]]*\\])?\\s*\\{([^{}]*)\\}`,
+	"g",
+);
+
+/**
+ * Scan `source` for font-holding macros (e.g. `\def \fontType {Arial}`) and
+ * return them as a map of macro name (without the leading backslash) to the
+ * trimmed replacement text. Used to resolve `\setmainfont{\fontType}` when the
+ * font name is stored in a variable. Later definitions win.
+ */
+export function extractMacroDefinitions(source: string): Map<string, string> {
+	const macros = new Map<string, string>();
+	let m: RegExpExecArray | null;
+	while ((m = MACRO_DEFINITION_PATTERN.exec(source)) !== null) {
+		let name: string | undefined;
+		let value: string | undefined;
+		if (m[1] !== undefined) {
+			name = m[1];
+			value = m[2];
+		} else {
+			name = m[3] ?? m[4];
+			value = m[5];
+		}
+		if (name === undefined || value === undefined) continue;
+		const trimmed = value.trim();
+		if (!trimmed) continue;
+		// Skip parameterized macros whose body references arguments (#1) — those
+		// are not simple font-name values.
+		if (/^#\d/.test(trimmed)) continue;
+		macros.set(name, trimmed);
+	}
+	return macros;
+}
+
+/** Expand a control sequence through the given macro map (chained definitions). */
+function resolveMacroValue(name: string, macros?: ReadonlyMap<string, string>): string {
+	let current = name;
+	for (let depth = 0; depth < 10; depth++) {
+		if (!current.startsWith("\\")) break;
+		const next = macros?.get(current.slice(1));
+		if (next === undefined) break;
+		current = next;
+	}
+	return current;
+}
+
 /* ──────────────────────────── Source rewriter ───────────────────────────────── */
 
 const COMMAND_REGEX = buildCommandRegex();
@@ -412,15 +473,16 @@ function mergeOptions(existing: string, add: string): string {
 	return `${existing},${additions.join(",")}`;
 }
 
-function rewriteOptionsForFontOptions(options: string, index: Map<string, FontIndexEntry>, aliases: Record<string, string>, rootDir: string, unresolved: UnresolvedFontRef[], offset: number, source: string, command: string): string {
+function rewriteOptionsForFontOptions(options: string, index: Map<string, FontIndexEntry>, aliases: Record<string, string>, rootDir: string, unresolved: UnresolvedFontRef[], offset: number, source: string, command: string, macros?: ReadonlyMap<string, string>): string {
 	return options.replace(FONT_OPTION_KEY_PATTERN, (match, key: string, value: string) => {
-		const hit = lookupFont(value, index, aliases);
+		const resolvedValue = resolveMacroValue(value, macros);
+		const hit = lookupFont(resolvedValue, index, aliases);
 		if (!hit.entry && !hit.alias) {
-			if (/\.(otf|ttf)$/i.test(value.trim())) return match;
+			if (/\.(otf|ttf)$/i.test(resolvedValue.trim())) return match;
 			const loc = indexLineCol(source, offset + match.indexOf(`${key}={`));
 			unresolved.push({
 				command,
-				name: value,
+				name: resolvedValue,
 				line: loc.line,
 				column: loc.column,
 				location: "option",
@@ -434,7 +496,7 @@ function rewriteOptionsForFontOptions(options: string, index: Map<string, FontIn
 		} else if (hit.alias) {
 			basename = aliasToOptions(hit.alias, rootDir).basename;
 		} else {
-			basename = value;
+			basename = resolvedValue;
 		}
 		return `${key}={${basename}}`;
 	});
@@ -445,9 +507,17 @@ export function resolveFontReferences(
 	index: Map<string, FontIndexEntry>,
 	aliases: Record<string, string> = {},
 	rootDir: string,
+	macros?: ReadonlyMap<string, string>,
 ): ResolveResult {
 	const rewritten: ResolveResult["rewritten"] = [];
 	const unresolved: UnresolvedFontRef[] = [];
+	// Combine caller-supplied macros (e.g. definitions collected from included
+	// files) with definitions found in this same source. Same-file definitions
+	// win so a local \def\fontType{...} overrides a value from another file.
+	const effectiveMacros = new Map<string, string>(macros ?? new Map());
+	for (const [name, value] of extractMacroDefinitions(source)) {
+		effectiveMacros.set(name, value);
+	}
 	const out = source.replace(
 		COMMAND_REGEX,
 		(
@@ -480,12 +550,15 @@ export function resolveFontReferences(
 			if (name === undefined) return match;
 
 			const loc = indexLineCol(source, offset);
-			const hit = lookupFont(name, index, aliases);
+			// Resolve font names stored in macros (e.g. \setmainfont{\fontType}
+			// where \fontType is defined via \def\fontType{Arial}).
+			const resolvedName = resolveMacroValue(name, effectiveMacros);
+			const hit = lookupFont(resolvedName, index, aliases);
 			if (!hit.entry && !hit.alias) {
-				if (/\.(otf|ttf)$/i.test(name.trim())) return match;
+				if (/\.(otf|ttf)$/i.test(resolvedName.trim())) return match;
 				unresolved.push({
 					command,
-					name,
+					name: resolvedName,
 					line: loc.line,
 					column: loc.column,
 					location: "argument",
@@ -505,7 +578,7 @@ export function resolveFontReferences(
 				basename = r.basename;
 			} else {
 				opts = "";
-				basename = name;
+				basename = resolvedName;
 			}
 
 			let newOptions = options ?? "";
@@ -523,6 +596,7 @@ export function resolveFontReferences(
 					offset,
 					source,
 					command,
+					effectiveMacros,
 				);
 			}
 
@@ -531,7 +605,7 @@ export function resolveFontReferences(
 				? `\\${command}${optsStr}${cmdBraced ? `{${cmdName}}` : `\\${cmdName}`}{${basename}}`
 				: `\\${command}${optsStr}{${basename}}`;
 
-			rewritten.push({ command, from: name, to: basename, line: loc.line });
+			rewritten.push({ command, from: resolvedName, to: basename, line: loc.line });
 			return replacement;
 		},
 	);

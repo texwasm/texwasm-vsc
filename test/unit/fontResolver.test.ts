@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
 	buildFontIndex,
+	extractMacroDefinitions,
 	mergeFontIndices,
 	readFontNames,
 	resolveFontReferences,
@@ -232,6 +233,44 @@ describe("fontResolver", () => {
 		});
 	});
 
+	describe("extractMacroDefinitions", () => {
+		it("extracts \\def-style definitions with spaces", () => {
+			const macros = extractMacroDefinitions("\\def \\fontType {Arial}");
+			assert.strictEqual(macros.get("fontType"), "Arial");
+		});
+
+		it("extracts \\def-style definitions without spaces", () => {
+			const macros = extractMacroDefinitions("\\def\\fontType{Arial}");
+			assert.strictEqual(macros.get("fontType"), "Arial");
+		});
+
+		it("extracts \\newcommand with unbraced name", () => {
+			const macros = extractMacroDefinitions("\\newcommand\\fontType{Fira Sans}");
+			assert.strictEqual(macros.get("fontType"), "Fira Sans");
+		});
+
+		it("extracts \\newcommand with braced name and star", () => {
+			const macros = extractMacroDefinitions("\\providecommand*{\\fontType}{Arial}");
+			assert.strictEqual(macros.get("fontType"), "Arial");
+		});
+
+		it("later definitions win", () => {
+			const macros = extractMacroDefinitions(
+				"\\def\\fontType{Arial}\n\\renewcommand\\fontType{Fira Sans}",
+			);
+			assert.strictEqual(macros.get("fontType"), "Fira Sans");
+		});
+
+		it("skips parameterized macros", () => {
+			const macros = extractMacroDefinitions("\\newcommand\\foo[1]{#1}");
+			assert.strictEqual(macros.size, 0);
+		});
+
+		it("returns empty map for no definitions", () => {
+			assert.strictEqual(extractMacroDefinitions("\\setmainfont{Arial}").size, 0);
+		});
+	});
+
 	describe("resolveFontReferences", () => {
 		function makeIndex(entries: Array<{ family: string; stem: string; ext: string; dir?: string }>) {
 			const m = new Map<string, ReturnType<typeof buildFontIndex> extends Map<string, infer V> ? V : never>();
@@ -417,6 +456,98 @@ describe("fontResolver", () => {
 			assert.strictEqual(r.rewritten[0].from, "Arial");
 			assert.strictEqual(r.rewritten[0].to, "arial");
 			assert.strictEqual(r.unresolved.length, 0);
+		});
+
+		it("resolves a font name stored in a macro defined in the same source", () => {
+			const index = makeIndex([{ family: "Arial", stem: "Arial", ext: ".ttf" }]);
+			const src = [
+				"\\def \\fontType {Arial}",
+				"\\setmainfont{\\fontType}",
+			].join("\n");
+			const r = resolveFontReferences(src, index, {}, testDir);
+			assert.ok(
+				r.source.includes("\\setmainfont[Path=./,Extension=.ttf]{Arial}"),
+				`expected rewritten setmainfont but got:\n${r.source}`,
+			);
+			assert.strictEqual(r.rewritten.length, 1);
+			assert.strictEqual(r.rewritten[0].from, "Arial");
+			assert.strictEqual(r.unresolved.length, 0);
+		});
+
+		it("resolves a font name stored in a macro passed from another file", () => {
+			// \fontType is defined in an included file (extractMacroDefinitions),
+			// \setmainfont uses it in the root — both files must be resolved together.
+			const index = makeIndex([{ family: "Fira Sans", stem: "FiraSans-Regular", ext: ".otf", dir: "fonts" }]);
+			const macros = extractMacroDefinitions("\\newcommand{\\fontType}{Fira Sans}");
+			const r = resolveFontReferences(
+				"\\setmainfont{\\fontType}",
+				index,
+				{},
+				testDir,
+				macros,
+			);
+			assert.ok(
+				r.source.includes("\\setmainfont[Path=fonts/,Extension=.otf]{FiraSans-Regular}"),
+				`expected cross-file rewrite but got:\n${r.source}`,
+			);
+			assert.strictEqual(r.rewritten.length, 1);
+			assert.strictEqual(r.unresolved.length, 0);
+		});
+
+		it("resolves chained macro definitions", () => {
+			const index = makeIndex([{ family: "Arial", stem: "arial", ext: ".ttf" }]);
+			const macros = extractMacroDefinitions(
+				"\\def\\family{Arial}\n\\def\\fontType{\\family}",
+			);
+			const r = resolveFontReferences(
+				"\\setmainfont{\\fontType}",
+				index,
+				{},
+				testDir,
+				macros,
+			);
+			assert.ok(r.source.includes("{arial}"));
+			assert.strictEqual(r.rewritten.length, 1);
+		});
+
+		it("reports an undefined macro as unresolved", () => {
+			const r = resolveFontReferences(
+				"\\setmainfont{\\fontType}",
+				new Map(),
+				{},
+				testDir,
+			);
+			assert.strictEqual(r.rewritten.length, 0);
+			assert.strictEqual(r.unresolved.length, 1);
+			assert.strictEqual(r.unresolved[0].name, "\\fontType");
+		});
+
+		it("reports a macro whose value is an unknown font as unresolved", () => {
+			const macros = extractMacroDefinitions("\\def\\fontType{Not Installed}");
+			const r = resolveFontReferences(
+				"\\setmainfont{\\fontType}",
+				new Map(),
+				{},
+				testDir,
+				macros,
+			);
+			assert.strictEqual(r.unresolved.length, 1);
+			assert.strictEqual(r.unresolved[0].name, "Not Installed");
+		});
+
+		it("resolves font option values stored in macros", () => {
+			const index = makeIndex([
+				{ family: "Fira Sans", stem: "FiraSans-Regular", ext: ".otf", dir: "fonts" },
+			]);
+			const macros = extractMacroDefinitions("\\def\\myUpright{Fira Sans}");
+			const r = resolveFontReferences(
+				"\\setmainfont[UprightFont={\\myUpright}]{Fira Sans}",
+				index,
+				{},
+				testDir,
+				macros,
+			);
+			assert.ok(r.source.includes("UprightFont={FiraSans-Regular}"));
 		});
 	});
 });
