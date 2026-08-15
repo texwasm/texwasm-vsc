@@ -22,6 +22,7 @@ A VS Code extension that compiles LaTeX to PDF **without a local TeX distributio
 - **System font resolution** — `fontspec` family names like `\setmainfont{Arial}` work out of the box using the fonts installed on your OS (`C:\Windows\Fonts`, `/usr/share/fonts`, etc.) — no manual alias file needed
 - **Root document detection** — auto-detects the root `.tex` file via `% !TEX root`, `\documentclass`, or explicit setting
 - **Forward search** — `Ctrl+Alt+J` to jump from `.tex` source to PDF page
+- **Word count** — count words in the active `.tex` file or across the whole workspace, with separate counts for text, section headers, captions, and footnotes, plus counts of headers, tables, figures, and inline math
 
 ## Commands
 
@@ -37,6 +38,8 @@ A VS Code extension that compiles LaTeX to PDF **without a local TeX distributio
 | `TeXWASM: Clear CTAN Package Cache` | — | Remove all cached CTAN packages |
 | `TeXWASM: List Cached Packages` | — | Show cached CTAN packages in output |
 | `TeXWASM: Rebuild System Font Index` | — | Re-scan system font directories and refresh the cache |
+| `TeXWASM: Word Count (Current File)` | — | Count words and structures in the active `.tex` file |
+| `TeXWASM: Word Count (Workspace)` | — | Count words across all `.tex` files in the workspace |
 
 ## Settings
 
