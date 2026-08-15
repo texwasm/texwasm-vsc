@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Word count feature: count words in the active `.tex` file (`TeXWASM: Word Count (Current File)`) or across all `.tex` files in the workspace (`TeXWASM: Word Count (Workspace)`). Words are reported for text, section headers, captions and footnotes separately, along with counts of headers, tables, figures and inline math.
+
 ### Fixed
 
 - "Querying CTAN for..." progress messages were shown even when the CTAN API was not called because package info was already resolved in memory. The query message now only appears for real CTAN API calls; packages served from the cache no longer print a misleading message.

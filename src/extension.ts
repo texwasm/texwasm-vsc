@@ -12,6 +12,11 @@ import { compileWith } from "./commands/compileWith";
 import { setCompilerRef, stopCompilation } from "./commands/stop";
 import { synctexForward } from "./commands/synctex";
 import { viewLog } from "./commands/viewLog";
+import {
+	disposeWordCountChannel,
+	wordCountActiveFile,
+	wordCountWorkspace,
+} from "./commands/wordCount";
 import { getAutoCompile } from "./config/settings";
 import { clearDiagnostics } from "./diagnostics/latexDiagnostics";
 import { Compiler } from "./engine/compiler";
@@ -77,6 +82,20 @@ export function activate(context: vscode.ExtensionContext): void {
 		"texwasm.synctexForward",
 		() => {
 			synctexForward();
+		},
+	);
+
+	const wordCountCmd = vscode.commands.registerCommand(
+		"texwasm.wordCount",
+		() => {
+			wordCountActiveFile();
+		},
+	);
+
+	const wordCountWorkspaceCmd = vscode.commands.registerCommand(
+		"texwasm.wordCountWorkspace",
+		() => {
+			wordCountWorkspace();
 		},
 	);
 
@@ -182,6 +201,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		cleanCmd,
 		stopCmd,
 		synctexCmd,
+		wordCountCmd,
+		wordCountWorkspaceCmd,
 		downloadEngineCmd,
 		clearPkgCacheCmd,
 		listPkgCacheCmd,
@@ -197,6 +218,7 @@ export function activate(context: vscode.ExtensionContext): void {
 export function deactivate(): void {
 	clearDiagnostics();
 	disposeOutputChannel();
+	disposeWordCountChannel();
 	appendLog("[TeXWASM] Extension deactivated.");
 }
 

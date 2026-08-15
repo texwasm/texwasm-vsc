@@ -69,6 +69,14 @@
       {
         "command": "texwasm.rebuildFontIndex",
         "title": "TeXWASM: Rebuild System Font Index"
+      },
+      {
+        "command": "texwasm.wordCount",
+        "title": "TeXWASM: Word Count (Current File)"
+      },
+      {
+        "command": "texwasm.wordCountWorkspace",
+        "title": "TeXWASM: Word Count (Workspace)"
       }
     ],
     "keybindings": [
