@@ -23,6 +23,7 @@ A VS Code extension that compiles LaTeX to PDF **without a local TeX distributio
 - **Root document detection** — auto-detects the root `.tex` file via `% !TEX root`, `\documentclass`, or explicit setting
 - **Forward search** — `Ctrl+Alt+J` to jump from `.tex` source to PDF page
 - **Word count** — count words in the active `.tex` file or across the whole workspace, with separate counts for text, section headers, captions, and footnotes, plus counts of headers, tables, figures, and inline math
+- **Formatting** — Format Document (Shift+Alt+F) indents the contents of each `\begin{...}/\end{...}` environment one level relative to its parent. Verbatim-style environments (`verbatim`, `lstlisting`, `minted`, …) keep their bodies byte-for-byte, and the indent width follows your editor's tab settings unless overridden with `texwasm.formatting.indentWidth`
 
 ## Commands
 
@@ -56,6 +57,7 @@ A VS Code extension that compiles LaTeX to PDF **without a local TeX distributio
 | `texwasm.rootDocument` | `""` | Root `.tex` path (relative to workspace). Auto-detected when empty. |
 | `texwasm.fontNameLookup` | `true` | Rewrite `\setmainfont{Family}` to filename references via the system font index |
 | `texwasm.systemFontDirectories` | `[]` | Additional font directories to scan (in addition to OS defaults) |
+| `texwasm.formatting.indentWidth` | `null` | Indent width (in spaces) used by Format Document. When `null`, the editor's "Tab Size" and "Insert Spaces" settings are used. |
 | `texwasm.tools` | *(see below)* | Tool definitions (command + args) referenced by recipes |
 | `texwasm.recipes` | *(see below)* | Recipe definitions (ordered tool sequences) for building |
 | `texwasm.recipe.default` | `"first"` | Which recipe to use by default (`"first"`, `"lastUsed"`, or a recipe name) |

@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Word count feature: count words in the active `.tex` file (`TeXWASM: Word Count (Current File)`) or across all `.tex` files in the workspace (`TeXWASM: Word Count (Workspace)`). Words are reported for text, section headers, captions and footnotes separately, along with counts of headers, tables, figures and inline math.
+- LaTeX document formatting (Format Document / Shift+Alt+F): the contents of each `\begin{...}/\end{...}` environment are indented one level relative to their parent. Verbatim-style environments (`verbatim`, `lstlisting`, `minted`, …) keep their bodies unchanged, blank lines and CRLF line endings are preserved, and leading/trailing whitespace is trimmed. The indent width follows the editor's tab size / insert-spaces settings and can be overridden with `texwasm.formatting.indentWidth`.
 
 ### Fixed
 
