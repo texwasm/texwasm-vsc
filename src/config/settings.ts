@@ -99,3 +99,9 @@ export function getSystemFontDirectories(resourceUri?: vscode.Uri): string[] {
 		.getConfiguration("texwasm", resourceUri ?? null)
 		.get<string[]>("systemFontDirectories", []);
 }
+
+export function getFormatIndentWidth(resourceUri?: vscode.Uri): number | null {
+	return vscode.workspace
+		.getConfiguration("texwasm", resourceUri ?? null)
+		.get<number | null>("formatting.indentWidth", null);
+}

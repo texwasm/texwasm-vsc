@@ -212,6 +212,12 @@
           },
           "default": [],
           "description": "Additional directories to scan for system fonts (in addition to the OS defaults: C:\\Windows\\Fonts, /usr/share/fonts, /Library/Fonts, etc.). Useful for project-local fonts or non-standard install locations."
+        },
+        "texwasm.formatting.indentWidth": {
+          "type": ["number", "null"],
+          "default": null,
+          "minimum": 0,
+          "description": "Indent width in spaces used when formatting a LaTeX document (Format Document). When null, the editor's 'Tab Size' and 'Insert Spaces' settings are used."
         }
       }
     }

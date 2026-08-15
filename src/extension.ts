@@ -17,12 +17,13 @@ import {
 	wordCountActiveFile,
 	wordCountWorkspace,
 } from "./commands/wordCount";
-import { getAutoCompile } from "./config/settings";
+import { getAutoCompile, getFormatIndentWidth } from "./config/settings";
 import { clearDiagnostics } from "./diagnostics/latexDiagnostics";
 import { Compiler } from "./engine/compiler";
 import type { StatusState } from "./engine/types";
 import { appendLog, disposeOutputChannel } from "./output/outputChannel";
 import { getFontIndexDir } from "./cache/storage";
+import { formatLatex } from "./utils/latexFormatter";
 import { getOrBuildSystemFontIndex, invalidateSystemFontIndex } from "./utils/systemFonts";
 
 let statusBarItem: vscode.StatusBarItem;
@@ -164,6 +165,29 @@ export function activate(context: vscode.ExtensionContext): void {
 		},
 	);
 
+	// Format Document support for LaTeX: indents the contents of environments.
+	const formatProvider = vscode.languages.registerDocumentFormattingEditProvider(
+		"latex",
+		{
+			provideDocumentFormattingEdits(document) {
+				const source = document.getText();
+				const formatted = formatLatex(source, getIndentString(document));
+				if (formatted === source) {
+					return [];
+				}
+				return [
+					vscode.TextEdit.replace(
+						new vscode.Range(
+							document.positionAt(0),
+							document.positionAt(source.length),
+						),
+						formatted,
+					),
+				];
+			},
+		},
+	);
+
 	// Proactively download the texlive-extra bundle when the user enables
 	// texwasm.includeExtraBundle, and tear down any active worker so the next
 	// compile re-initializes with the new bundle flag (the worker only reads
@@ -208,6 +232,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		listPkgCacheCmd,
 		rebuildFontIndexCmd,
 		autoCompileDisposable,
+		formatProvider,
 		configChangeDisposable,
 		statusBarItem,
 	);
@@ -236,6 +261,25 @@ async function promptEnableExtraBundle(): Promise<void> {
 	await vscode.workspace
 		.getConfiguration("texwasm")
 		.update("includeExtraBundle", true, vscode.ConfigurationTarget.Global);
+}
+
+/** Returns the indentation string used by the LaTeX formatter: the configured
+ *  texwasm.formatting.indentWidth when set, otherwise the editor's tab
+ *  size / insert-spaces settings for the document. */
+function getIndentString(document: vscode.TextDocument): string {
+	const configured = getFormatIndentWidth(document.uri);
+	if (configured !== null && configured > 0) {
+		return " ".repeat(configured);
+	}
+	const editorConfig = vscode.workspace.getConfiguration(
+		"editor",
+		document.uri,
+	);
+	const insertSpaces = editorConfig.get<boolean>("insertSpaces", true);
+	const tabSize = editorConfig.get<number>("tabSize", 4);
+	return insertSpaces
+		? " ".repeat(typeof tabSize === "number" && tabSize > 0 ? tabSize : 4)
+		: "\t";
 }
 
 function updateStatusBar(state: StatusState): void {
