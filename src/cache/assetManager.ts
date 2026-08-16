@@ -7,6 +7,8 @@ import * as vscode from "vscode";
 import {
 	getAssetsDir,
 	getBiberDir,
+	getExtensionAssetsDir,
+	getExtensionBiberDir,
 	resolveAssetPath,
 	resolveAssetsDir,
 	resolveBiberPath,
@@ -19,6 +21,35 @@ const BASE_ASSETS = ["busytex.js", "busytex.wasm", "texlive-basic.js", "texlive-
 const EXTRA_ASSETS = ["texlive-extra.js", "texlive-extra.data"];
 
 const BIBER_FILES = ["biber_wasm.js", "biber_wasm_bg.wasm", "biber_wasm.d.ts", "biber_wasm_bg.wasm.d.ts"];
+
+/** Marker file storing the version the cached assets were downloaded from. */
+const VERSION_FILE = ".version";
+
+/** The engine asset URL acts as the version identifier: the release tag (e.g.
+ *  the date) is embedded in the URL and changes whenever a new busytex release
+ *  is published. */
+const ENGINE_VERSION = assetUrls.engineBaseUrl;
+
+/** Likewise, the biber release version is embedded in its download URL. */
+const BIBER_VERSION = assetUrls.biber;
+
+function readVersion(dir: string): string | undefined {
+	try {
+		const version = fs.readFileSync(path.join(dir, VERSION_FILE), "utf8");
+		return version.length > 0 ? version : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function writeVersion(dir: string, version: string): void {
+	fs.writeFileSync(path.join(dir, VERSION_FILE), version, "utf8");
+}
+
+/** Remove a whole cache directory (and any version marker inside it). */
+function removeCachedDir(dir: string): void {
+	fs.rmSync(dir, { recursive: true, force: true });
+}
 
 function getRequiredAssets(includeExtra: boolean): string[] {
 	return includeExtra ? [...BASE_ASSETS, ...EXTRA_ASSETS] : BASE_ASSETS;
@@ -134,7 +165,27 @@ export class AssetManager {
 		);
 	}
 
+	/** True when the downloaded assets in globalStorage are stale: a new
+	 *  busytex release is referenced by assetUrls.json, or assets were cached
+	 *  before the version marker existed. */
+	private needsEngineUpdate(): boolean {
+		// Bundled assets ship with the extension, so they are always current.
+		if (fs.existsSync(path.join(getExtensionAssetsDir(this.context), "busytex.js"))) {
+			return false;
+		}
+		const assetsDir = getAssetsDir(this.context);
+		if (!fs.existsSync(path.join(assetsDir, "busytex.js"))) {
+			return false;
+		}
+		const cachedVersion = readVersion(assetsDir);
+		// No marker means the cache predates version tracking; refresh it.
+		return cachedVersion !== ENGINE_VERSION;
+	}
+
 	async ensureAssets(): Promise<boolean> {
+		if (this.needsEngineUpdate()) {
+			removeCachedDir(getAssetsDir(this.context));
+		}
 		if (this.isDownloaded()) {
 			return true;
 		}
@@ -153,7 +204,27 @@ export class AssetManager {
 		return result;
 	}
 
+	/** True when the downloaded biber in globalStorage is stale: a new biber
+	 *  release is referenced by assetUrls.json, or biber was cached before the
+	 *  version marker existed. */
+	private needsBiberUpdate(): boolean {
+		// Bundled biber ships with the extension, so it is always current.
+		if (fs.existsSync(path.join(getExtensionBiberDir(this.context), "biber_wasm.js"))) {
+			return false;
+		}
+		const biberDir = getBiberDir(this.context);
+		if (!fs.existsSync(path.join(biberDir, "biber_wasm.js"))) {
+			return false;
+		}
+		const cachedVersion = readVersion(biberDir);
+		// No marker means the cache predates version tracking; refresh it.
+		return cachedVersion !== BIBER_VERSION;
+	}
+
 	async ensureBiber(): Promise<boolean> {
+		if (this.needsBiberUpdate()) {
+			removeCachedDir(getBiberDir(this.context));
+		}
 		if (this.biberDownloaded()) {
 			return true;
 		}
@@ -185,6 +256,7 @@ export class AssetManager {
 						gunzip.end(buffer);
 					});
 
+					writeVersion(this.biberDir, BIBER_VERSION);
 					return true;
 				} catch (err) {
 					await showAssetDownloadError(
@@ -233,6 +305,7 @@ export class AssetManager {
 				await this.downloadFile(file, destPath);
 			}
 
+			writeVersion(downloadDir, ENGINE_VERSION);
 			return true;
 		} catch (err) {
 			await showAssetDownloadError(

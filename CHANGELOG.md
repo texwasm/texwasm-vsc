@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Word count feature: count words in the active `.tex` file (`TeXWASM: Word Count (Current File)`) or across all `.tex` files in the workspace (`TeXWASM: Word Count (Workspace)`). Words are reported for text, section headers, captions and footnotes separately, along with counts of headers, tables, figures and inline math.
 - LaTeX document formatting (Format Document / Shift+Alt+F): the contents of each `\begin{...}/\end{...}` environment are indented one level relative to their parent. Verbatim-style environments (`verbatim`, `lstlisting`, `minted`, …) keep their bodies unchanged, blank lines and CRLF line endings are preserved, and leading/trailing whitespace is trimmed. The indent width follows the editor's tab size / insert-spaces settings and can be overridden with `texwasm.formatting.indentWidth`.
 
+### Changed
+
+- Cached engine (busytex) and biber WASM assets are now refreshed automatically: when the release referenced in `src/cache/assetUrls.json` changes, the previously downloaded assets are deleted from global storage and the new version is downloaded.
+
 ### Fixed
 
 - "Querying CTAN for..." progress messages were shown even when the CTAN API was not called because package info was already resolved in memory. The query message now only appears for real CTAN API calls; packages served from the cache no longer print a misleading message.
