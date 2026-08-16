@@ -184,6 +184,28 @@ export function setStatusChangeHandler(
 	onStatusChange = handler;
 }
 
+/** Find the most relevant open LaTeX document to compile. Prefers the active
+ *  text editor, then any visible editor, then any open document. This lets
+ *  "Compile" work from contexts without an active text editor (e.g. when the
+ *  getting-started walkthrough page has focus). */
+export function findLatexSourceUri(): vscode.Uri | undefined {
+	const candidates: (vscode.TextDocument | undefined)[] = [
+		vscode.window.activeTextEditor?.document,
+		...vscode.window.visibleTextEditors.map((e) => e.document),
+		...vscode.workspace.textDocuments,
+	];
+	const seen = new Set<string>();
+	for (const document of candidates) {
+		if (!document) continue;
+		if (seen.has(document.uri.toString())) continue;
+		seen.add(document.uri.toString());
+		if (document.languageId === "latex") {
+			return document.uri;
+		}
+	}
+	return undefined;
+}
+
 export async function compileDocument(
 	documentUri?: vscode.Uri,
 	recipeName?: string,
@@ -193,16 +215,12 @@ export async function compileDocument(
 		return;
 	}
 
-	let sourceUri: vscode.Uri;
-	if (documentUri) {
-		sourceUri = documentUri;
-	} else {
-		const editor = vscode.window.activeTextEditor;
-		if (!editor) {
-			vscode.window.showErrorMessage("TeXWASM: No active editor.");
-			return;
-		}
-		sourceUri = editor.document.uri;
+	const sourceUri = documentUri ?? findLatexSourceUri();
+	if (!sourceUri) {
+		vscode.window.showErrorMessage(
+			"TeXWASM: No active LaTeX file. Open a .tex file first.",
+		);
+		return;
 	}
 
 	const document = await vscode.workspace.openTextDocument(sourceUri);

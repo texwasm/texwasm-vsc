@@ -9,7 +9,9 @@ A VS Code extension that compiles LaTeX to PDF **without a local TeX distributio
 
 ## Features
 
-- **Compile LaTeX to PDF** — `Ctrl+Alt+B` (or `Cmd+Alt+B` on macOS)
+- **Getting-started walkthrough** — an interactive checklist (auto-shown on first use, or via `TeXWASM: Open Getting Started Walkthrough`) that creates a `hello.tex` starter file and guides you through your first compile, viewing the PDF, reading the log, and configuring the extension
+- **Compile LaTeX to PDF** — `Ctrl+Alt+B` (or `Cmd+Alt+B` on macOS); the PDF opens in VS Code's built-in viewer
+- **View PDF** — reopen the compiled PDF for the current document at any time (`TeXWASM: View PDF`)
 - **No TeX distribution needed** — pdflatex runs as WebAssembly
 - **Multi-engine support** — pdfLaTeX, XeLaTeX, LuaLaTeX
 - **Customizable recipes** — define tool sequences like `pdflatex → bibtex → pdflatex × 2` (LaTeX Workshop compatible)
@@ -32,6 +34,7 @@ A VS Code extension that compiles LaTeX to PDF **without a local TeX distributio
 | `TeXWASM: Compile LaTeX to PDF` | `Ctrl+Alt+B` | Compile the active `.tex` file |
 | `TeXWASM: Compile with...` | — | Choose a recipe (custom tool sequence) |
 | `TeXWASM: View Log` | — | Open the compilation log |
+| `TeXWASM: View PDF` | — | Open the compiled PDF for the current LaTeX document |
 | `TeXWASM: Clean Auxiliary Files` | — | Remove `.aux`, `.log`, `.out`, etc. |
 | `TeXWASM: Stop Compilation` | — | Cancel a running compilation |
 | `TeXWASM: Download/Update Engine` | — | Force re-download of WASM assets |
@@ -41,6 +44,8 @@ A VS Code extension that compiles LaTeX to PDF **without a local TeX distributio
 | `TeXWASM: Rebuild System Font Index` | — | Re-scan system font directories and refresh the cache |
 | `TeXWASM: Word Count (Current File)` | — | Count words and structures in the active `.tex` file |
 | `TeXWASM: Word Count (Workspace)` | — | Count words across all `.tex` files in the workspace |
+| `TeXWASM: Open Getting Started Walkthrough` | — | Re-open the interactive getting-started walkthrough |
+| `TeXWASM: Create Hello World .tex File` | — | Create a starter `hello.tex` in the workspace and open it |
 
 ## Settings
 

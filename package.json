@@ -77,6 +77,88 @@
       {
         "command": "texwasm.wordCountWorkspace",
         "title": "TeXWASM: Word Count (Workspace)"
+      },
+      {
+        "command": "texwasm.walkthrough",
+        "title": "TeXWASM: Open Getting Started Walkthrough"
+      },
+      {
+        "command": "texwasm.createHelloWorld",
+        "title": "TeXWASM: Create Hello World .tex File"
+      },
+      {
+        "command": "texwasm.viewPdf",
+        "title": "TeXWASM: View PDF"
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "texwasm.gettingStarted",
+        "title": "Get Started with TeXWASM",
+        "description": "Compile LaTeX to PDF with WebAssembly - no local TeX distribution required.",
+        "featuredFor": [
+          "**/*.tex"
+        ],
+        "steps": [
+          {
+            "id": "open",
+            "title": "Create a Hello World document",
+            "description": "Create a starter `hello.tex` file in this workspace, or open an existing `.tex` file. TeXWASM activates automatically on LaTeX files and shows its status in the status bar.\n\n[Create Hello World](command:texwasm.createHelloWorld)",
+            "completionEvents": [
+              "onContext:editorLangId == latex",
+              "onCommand:texwasm.createHelloWorld"
+            ],
+            "media": {
+              "markdown": "media/walkthrough/open.md"
+            }
+          },
+          {
+            "id": "compile",
+            "title": "Compile to PDF",
+            "description": "Run the first build. On first use the WebAssembly engine is downloaded and cached (~100-500 MB); afterwards compiles are instant.\n\n[Compile LaTeX to PDF](command:texwasm.compile)\n\nYou can also press `Ctrl+Alt+B` (macOS: `Cmd+Alt+B`) or rely on compile-on-save.",
+            "completionEvents": [
+              "onCommand:texwasm.compile"
+            ],
+            "media": {
+              "markdown": "media/walkthrough/compile.md"
+            }
+          },
+          {
+            "id": "viewPdf",
+            "title": "View the PDF",
+            "description": "The compiled PDF opens automatically next to your source after a successful build. You can also reopen it at any time.\n\n[View PDF](command:texwasm.viewPdf)",
+            "completionEvents": [
+              "onCommand:texwasm.viewPdf"
+            ],
+            "media": {
+              "markdown": "media/walkthrough/viewPdf.md"
+            }
+          },
+          {
+            "id": "viewLog",
+            "title": "Diagnose failures with the log",
+            "description": "Warnings and errors from the build appear as inline diagnostics in the editor. When something goes wrong, the full log is one click away.\n\n[View Log](command:texwasm.viewLog)",
+            "completionEvents": [
+              "onCommand:texwasm.viewLog"
+            ],
+            "media": {
+              "markdown": "media/walkthrough/log.md"
+            }
+          },
+          {
+            "id": "configure",
+            "title": "Configure engines and recipes",
+            "description": "Choose the default engine, control compile-on-save, preload extra packages, or define custom build recipes.\n\n[Open TeXWASM Settings](command:workbench.action.openSettings?[\"@ext:ltex-plus.texwasm\"])",
+            "completionEvents": [
+              "onSettingChanged:texwasm.engine",
+              "onSettingChanged:texwasm.recipes",
+              "onSettingChanged:texwasm.includeExtraBundle"
+            ],
+            "media": {
+              "markdown": "media/walkthrough/configure.md"
+            }
+          }
+        ]
       }
     ],
     "keybindings": [

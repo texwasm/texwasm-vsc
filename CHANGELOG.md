@@ -6,8 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Getting-started walkthrough: an interactive checklist (auto-shown on first activation or via `TeXWASM: Open Getting Started Walkthrough`) with steps to create a `hello.tex` starter file, run the first compile, view the compiled PDF, diagnose failures with the log, and configure engines/recipes.
+- `TeXWASM: Create Hello World .tex File` command: creates a starter `hello.tex` in the workspace and opens it, wired into the walkthrough's first step.
+- `TeXWASM: View PDF` command: opens the compiled PDF for the current LaTeX document (honors `texwasm.outputDirectory` and root-document detection), exposed as a "View the PDF" walkthrough step.
+
 ### Fixed
 
+- The PDF now renders in VS Code's built-in PDF viewer. Previously it was opened with `showTextDocument`, which displays a binary/unsupported-encoding text tab instead of the rendered document; "TeXWASM: View PDF" and the PDF auto-opened after compilation now use `vscode.open` (through the editor resolver) so the resource opens as a real PDF.
+- "Compile LaTeX to PDF" no longer fails with "No active editor" when triggered from the getting-started walkthrough (or anywhere the walkthrough page has focus instead of a text editor). Compilation now falls back to the active, visible, or any open LaTeX document.
 - The compiled PDF no longer replaces the LaTeX source in split-window layouts. Previously `vscode.open` was called without a view column, so the PDF opened in the active editor group and took over the pane containing the `.tex` file. The PDF now reuses an already-open tab (in whatever editor group it lives) or opens beside the active editor, and focus is preserved so the source stays active after compilation.
 
 ## [0.4.0] - 2026-08-16

@@ -33,6 +33,9 @@ describe('TeXWASM Extension', () => {
       'texwasm.downloadEngine',
       'texwasm.clearPackageCache',
       'texwasm.listPackageCache',
+      'texwasm.walkthrough',
+      'texwasm.createHelloWorld',
+      'texwasm.viewPdf',
     ];
     for (const cmd of expected) {
       assert.ok(commands.includes(cmd), `Command ${cmd} should be registered`);

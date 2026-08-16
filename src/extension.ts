@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { AssetManager, showAssetDownloadError } from "./cache/assetManager";
 import { PackageCache } from "./cache/packageCache";
 import { cleanAuxiliaryFiles } from "./commands/clean";
+import { createHelloWorldFile } from "./commands/helloWorld";
 import {
 	compileDocument,
 	setCompiler,
@@ -12,6 +13,7 @@ import { compileWith } from "./commands/compileWith";
 import { setCompilerRef, stopCompilation } from "./commands/stop";
 import { synctexForward } from "./commands/synctex";
 import { viewLog } from "./commands/viewLog";
+import { viewPdf } from "./commands/viewPdf";
 import {
 	disposeWordCountChannel,
 	wordCountActiveFile,
@@ -99,6 +101,27 @@ export function activate(context: vscode.ExtensionContext): void {
 			wordCountWorkspace();
 		},
 	);
+
+	const walkthroughCmd = vscode.commands.registerCommand(
+		"texwasm.walkthrough",
+		() => {
+			void vscode.commands.executeCommand(
+				"workbench.action.openWalkthrough",
+				`${context.extension.id}#texwasm.gettingStarted`,
+			);
+		},
+	);
+
+	const createHelloWorldCmd = vscode.commands.registerCommand(
+		"texwasm.createHelloWorld",
+		() => {
+			void createHelloWorldFile();
+		},
+	);
+
+	const viewPdfCmd = vscode.commands.registerCommand("texwasm.viewPdf", () => {
+		void viewPdf();
+	});
 
 		const downloadEngineCmd = vscode.commands.registerCommand(
 			"texwasm.downloadEngine",
@@ -188,6 +211,19 @@ export function activate(context: vscode.ExtensionContext): void {
 		},
 	);
 
+	// Show the getting-started walkthrough once, the first time the extension
+	// is activated in a new installation. VS Code's built-in open-on-install
+	// only covers walkthroughs added after a fresh install, so this also
+	// catches users who install from a .vsix or upgrade from an older version.
+	const WALKTHROUGH_SHOWN_KEY = "texwasm.walkthrough.shown";
+	if (!context.globalState.get<boolean>(WALKTHROUGH_SHOWN_KEY)) {
+		void context.globalState.update(WALKTHROUGH_SHOWN_KEY, true);
+		void vscode.commands.executeCommand(
+			"workbench.action.openWalkthrough",
+			`${context.extension.id}#texwasm.gettingStarted`,
+		);
+	}
+
 	// Proactively download the texlive-extra bundle when the user enables
 	// texwasm.includeExtraBundle, and tear down any active worker so the next
 	// compile re-initializes with the new bundle flag (the worker only reads
@@ -227,6 +263,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		synctexCmd,
 		wordCountCmd,
 		wordCountWorkspaceCmd,
+		walkthroughCmd,
+		createHelloWorldCmd,
+		viewPdfCmd,
 		downloadEngineCmd,
 		clearPkgCacheCmd,
 		listPkgCacheCmd,
