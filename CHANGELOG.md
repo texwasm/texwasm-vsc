@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The compiled PDF no longer replaces the LaTeX source in split-window layouts. Previously `vscode.open` was called without a view column, so the PDF opened in the active editor group and took over the pane containing the `.tex` file. The PDF now reuses an already-open tab (in whatever editor group it lives) or opens beside the active editor, and focus is preserved so the source stays active after compilation.
+
 ## [0.4.0] - 2026-08-16
 
 ### Added
