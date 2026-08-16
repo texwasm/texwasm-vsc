@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-16
+
 ### Added
 
 - Word count feature: count words in the active `.tex` file (`TeXWASM: Word Count (Current File)`) or across all `.tex` files in the workspace (`TeXWASM: Word Count (Workspace)`). Words are reported for text, section headers, captions and footnotes separately, along with counts of headers, tables, figures and inline math.
