@@ -2,7 +2,7 @@
   "name": "texwasm",
   "displayName": "TeXWASM",
   "description": "Compile LaTeX to PDF using WebAssembly — no local TeX distribution required",
-  "version": "0.5.0-alpha",
+  "version": "0.5.0",
   "publisher": "ltex-plus",
   "icon": "images/icon.png",
   "license": "AGPL-3.0-only",

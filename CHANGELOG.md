@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-18
+
 ### Added
 
 - Getting-started walkthrough: an interactive checklist (auto-shown on first activation or via `TeXWASM: Open Getting Started Walkthrough`) with steps to create a `hello.tex` starter file, run the first compile, view the compiled PDF, diagnose failures with the log, and configure engines/recipes.
