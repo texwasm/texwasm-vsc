@@ -1,9 +1,9 @@
 import * as fs from "node:fs";
 import * as https from "node:https";
 import * as path from "node:path";
-import * as zlib from "node:zlib";
-import * as tar from "tar";
 import * as vscode from "vscode";
+import * as pkg from "../../package.json";
+import assetUrls from "./assetUrls.json";
 import {
 	getAssetsDir,
 	getBiberDir,
@@ -13,14 +13,17 @@ import {
 	resolveAssetsDir,
 	resolveBiberPath,
 } from "./storage";
-import assetUrls from "./assetUrls.json";
-import * as pkg from "../../package.json";
 
-const BASE_ASSETS = ["busytex.js", "busytex.wasm", "texlive-basic.js", "texlive-basic.data"];
+const BASE_ASSETS = [
+	"busytex.js",
+	"busytex.wasm",
+	"texlive-basic.js",
+	"texlive-basic.data",
+];
 
 const EXTRA_ASSETS = ["texlive-extra.js", "texlive-extra.data"];
 
-const BIBER_FILES = ["biber_wasm.js", "biber_wasm_bg.wasm", "biber_wasm.d.ts", "biber_wasm_bg.wasm.d.ts"];
+const BIBER_FILES = ["biber.js", "biber.wasm", "biber.data"];
 
 /** Marker file storing the version the cached assets were downloaded from. */
 const VERSION_FILE = ".version";
@@ -28,10 +31,10 @@ const VERSION_FILE = ".version";
 /** The engine asset URL acts as the version identifier: the release tag (e.g.
  *  the date) is embedded in the URL and changes whenever a new busytex release
  *  is published. */
-const ENGINE_VERSION = assetUrls.engineBaseUrl;
+const ENGINE_VERSION = assetUrls.baseUrl;
 
 /** Likewise, the biber release version is embedded in its download URL. */
-const BIBER_VERSION = assetUrls.biber;
+const BIBER_VERSION = assetUrls.baseUrl;
 
 function readVersion(dir: string): string | undefined {
 	try {
@@ -102,28 +105,18 @@ function downloadFile(url: string, destPath: string): Promise<void> {
 	});
 }
 
-function downloadToBuffer(url: string): Promise<Buffer> {
-	return new Promise<Buffer>((resolve, reject) => {
-		https
-			.get(url, (response) => {
-				if (response.statusCode === 302 || response.statusCode === 301) {
-					const redirectUrl = response.headers.location;
-					if (redirectUrl) {
-						downloadToBuffer(redirectUrl).then(resolve, reject);
-						return;
-					}
-				}
-				if (response.statusCode !== 200) {
-					reject(new Error(`HTTP ${response.statusCode} for ${url}`));
-					return;
-				}
-				const chunks: Buffer[] = [];
-				response.on("data", (chunk: Buffer) => chunks.push(chunk));
-				response.on("end", () => resolve(Buffer.concat(chunks)));
-				response.on("error", reject);
-			})
-			.on("error", reject);
-	});
+/** A set of WASM assets that can be downloaded on demand. */
+interface AssetBundle {
+	/** File names that make up the bundle, fetched from baseUrl. */
+	files: string[];
+	/** Download URL prefix shared by all files. */
+	baseUrl: string;
+	/** Version written to the marker file once the download completes. */
+	version: string;
+	/** Download directory inside globalStorage. */
+	dir: string;
+	/** Label used when a download fails. */
+	errorLabel: string;
 }
 
 export class AssetManager {
@@ -150,7 +143,7 @@ export class AssetManager {
 	}
 
 	private get sizeLabel(): string {
-		return this._includeExtra ? "~500 MB" : "~120 MB";
+		return this._includeExtra ? "~530 MB" : "~150 MB";
 	}
 
 	isDownloaded(): boolean {
@@ -160,163 +153,141 @@ export class AssetManager {
 	}
 
 	biberDownloaded(): boolean {
-		return BIBER_FILES.some(
+		return BIBER_FILES.every(
 			(file) => resolveBiberPath(this.context, file) !== undefined,
 		);
 	}
 
-	/** True when the downloaded assets in globalStorage are stale: a new
-	 *  busytex release is referenced by assetUrls.json, or assets were cached
-	 *  before the version marker existed. */
-	private needsEngineUpdate(): boolean {
-		// Bundled assets ship with the extension, so they are always current.
-		if (fs.existsSync(path.join(getExtensionAssetsDir(this.context), "busytex.js"))) {
+	/** True when a cached download in globalStorage is stale: a new release is
+	 *  referenced by assetUrls.json, or the cache was written before the
+	 *  version marker existed. Bundled assets ship with the extension, so they
+	 *  are always current. */
+	private needsUpdate(
+		downloadDir: string,
+		bundledDir: string,
+		primaryFile: string,
+		version: string,
+	): boolean {
+		if (fs.existsSync(path.join(bundledDir, primaryFile))) {
 			return false;
 		}
-		const assetsDir = getAssetsDir(this.context);
-		if (!fs.existsSync(path.join(assetsDir, "busytex.js"))) {
+		if (!fs.existsSync(path.join(downloadDir, primaryFile))) {
 			return false;
 		}
-		const cachedVersion = readVersion(assetsDir);
 		// No marker means the cache predates version tracking; refresh it.
-		return cachedVersion !== ENGINE_VERSION;
+		return readVersion(downloadDir) !== version;
 	}
 
 	async ensureAssets(): Promise<boolean> {
-		if (this.needsEngineUpdate()) {
-			removeCachedDir(getAssetsDir(this.context));
-		}
-		if (this.isDownloaded()) {
-			return true;
-		}
-
-		const result = await vscode.window.withProgress(
-			{
-				location: vscode.ProgressLocation.Notification,
-				title: `TeXWASM: Downloading engine assets (${this.sizeLabel})`,
-				cancellable: true,
-			},
-			async (progress, token) => {
-				return this.downloadAssets(progress, token);
-			},
-		);
-
-		return result;
-	}
-
-	/** True when the downloaded biber in globalStorage is stale: a new biber
-	 *  release is referenced by assetUrls.json, or biber was cached before the
-	 *  version marker existed. */
-	private needsBiberUpdate(): boolean {
-		// Bundled biber ships with the extension, so it is always current.
-		if (fs.existsSync(path.join(getExtensionBiberDir(this.context), "biber_wasm.js"))) {
-			return false;
-		}
+		const assetsDir = getAssetsDir(this.context);
 		const biberDir = getBiberDir(this.context);
-		if (!fs.existsSync(path.join(biberDir, "biber_wasm.js"))) {
-			return false;
+		if (
+			this.needsUpdate(
+				assetsDir,
+				getExtensionAssetsDir(this.context),
+				"busytex.js",
+				ENGINE_VERSION,
+			)
+		) {
+			removeCachedDir(assetsDir);
 		}
-		const cachedVersion = readVersion(biberDir);
-		// No marker means the cache predates version tracking; refresh it.
-		return cachedVersion !== BIBER_VERSION;
-	}
-
-	async ensureBiber(): Promise<boolean> {
-		if (this.needsBiberUpdate()) {
-			removeCachedDir(getBiberDir(this.context));
+		if (
+			this.needsUpdate(
+				biberDir,
+				getExtensionBiberDir(this.context),
+				"biber.js",
+				BIBER_VERSION,
+			)
+		) {
+			removeCachedDir(biberDir);
 		}
-		if (this.biberDownloaded()) {
+		if (this.isDownloaded() && this.biberDownloaded()) {
 			return true;
 		}
-
-		const result = await vscode.window.withProgress(
-			{
-				location: vscode.ProgressLocation.Notification,
-				title: "TeXWASM: Downloading biber WASM (~4 MB)",
-				cancellable: true,
-			},
-			async (progress, token) => {
-				try {
-					progress.report({ message: "Downloading biber WASM..." });
-					if (!fs.existsSync(this.biberDir)) {
-						fs.mkdirSync(this.biberDir, { recursive: true });
-					}
-
-					const buffer = await downloadToBuffer(assetUrls.biber);
-
-					if (token.isCancellationRequested) return false;
-
-					progress.report({ message: "Extracting biber WASM..." });
-					const gunzip = zlib.createGunzip();
-					await new Promise<void>((resolve, reject) => {
-						const extractor = tar.extract({ cwd: this.biberDir });
-						extractor.on("finish", () => resolve());
-						extractor.on("error", reject);
-						gunzip.pipe(extractor);
-						gunzip.end(buffer);
-					});
-
-					writeVersion(this.biberDir, BIBER_VERSION);
-					return true;
-				} catch (err) {
-					await showAssetDownloadError(
-						`Failed to download biber WASM: ${err instanceof Error ? err.message : String(err)}`,
-					);
-					return false;
-				}
-			},
+		return this.downloadBundles(
+			`TeXWASM: Downloading engine and biber assets (${this.sizeLabel})`,
+			[
+				{
+					files: this.requiredAssets,
+					baseUrl: assetUrls.baseUrl,
+					version: ENGINE_VERSION,
+					dir: assetsDir,
+					errorLabel: "Failed to download engine assets",
+				},
+				{
+					files: BIBER_FILES,
+					baseUrl: assetUrls.baseUrl,
+					version: BIBER_VERSION,
+					dir: biberDir,
+					errorLabel: "Failed to download biber WASM",
+				},
+			],
 		);
-
-		return result;
 	}
 
-	private async downloadAssets(
-		progress: vscode.Progress<{ message?: string; increment?: number }>,
-		token: vscode.CancellationToken,
+	/** Download the files of the given asset bundles into their directories,
+	 *  skipping files that are already present, and record each bundle's
+	 *  version on success. */
+	private downloadBundles(
+		title: string,
+		bundles: AssetBundle[],
 	): Promise<boolean> {
-		try {
-			const downloadDir = getAssetsDir(this.context);
-			if (!fs.existsSync(downloadDir)) {
-				fs.mkdirSync(downloadDir, { recursive: true });
-			}
+		const totalFiles = bundles.reduce(
+			(sum, bundle) => sum + bundle.files.length,
+			0,
+		);
+		return Promise.resolve(
+			vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title,
+					cancellable: true,
+				},
+				async (progress, token) => {
+					let errorLabel = "Failed to download assets";
+					try {
+						for (const bundle of bundles) {
+							errorLabel = bundle.errorLabel;
+							if (!fs.existsSync(bundle.dir)) {
+								fs.mkdirSync(bundle.dir, { recursive: true });
+							}
 
-			const assets = this.requiredAssets;
-			const totalFiles = assets.length;
+							for (const file of bundle.files) {
+								if (token.isCancellationRequested) {
+									return false;
+								}
 
-			for (const file of assets) {
-				if (token.isCancellationRequested) {
-					return false;
-				}
+								const destPath = path.join(bundle.dir, file);
+								if (fs.existsSync(destPath)) {
+									progress.report({
+										message: `${file} (already cached)`,
+										increment: (1 / totalFiles) * 100,
+									});
+									continue;
+								}
 
-				const destPath = path.join(downloadDir, file);
-				if (fs.existsSync(destPath)) {
-					progress.report({
-						message: `${file} (already cached)`,
-						increment: (1 / totalFiles) * 100,
-					});
-					continue;
-				}
+								progress.report({
+									message: `Downloading ${file}...`,
+									increment: (1 / totalFiles) * 100,
+								});
 
-				progress.report({
-					message: `Downloading ${file}...`,
-					increment: (1 / totalFiles) * 100,
-				});
+								await downloadFile(
+									`${bundle.baseUrl}/${file}`,
+									destPath,
+								);
+							}
 
-				await this.downloadFile(file, destPath);
-			}
-
-			writeVersion(downloadDir, ENGINE_VERSION);
-			return true;
-		} catch (err) {
-			await showAssetDownloadError(
-				`Failed to download engine assets: ${err instanceof Error ? err.message : String(err)}`,
-			);
-			return false;
-		}
-	}
-
-	private downloadFile(filename: string, destPath: string): Promise<void> {
-		const url = `${assetUrls.engineBaseUrl}/${filename}`;
-		return downloadFile(url, destPath);
+							writeVersion(bundle.dir, bundle.version);
+						}
+						return true;
+					} catch (err) {
+						await showAssetDownloadError(
+							`${errorLabel}: ${err instanceof Error ? err.message : String(err)}`,
+						);
+						return false;
+					}
+				},
+			),
+		);
 	}
 }

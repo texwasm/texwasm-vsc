@@ -255,10 +255,10 @@ export async function compileDocument(
 		);
 	}
 
-	// Ensure WASM engine assets are downloaded before anything touches the worker
-	// (package-cache docstrip and the main compile both init the worker, which
-	// verifies asset presence and aborts with "Required asset not found" if
-	// they're missing).
+	// Ensure WASM engine and biber assets are downloaded before anything touches
+	// the worker (package-cache docstrip and the main compile both init the
+	// worker, which verifies asset presence and aborts with "Required asset not
+	// found" if they're missing).
 	const assetManager = new AssetManager(compiler.extensionContext);
 	const assetsReady = await assetManager.ensureAssets();
 	if (!assetsReady) {
@@ -339,17 +339,6 @@ export async function compileDocument(
 		);
 	}
 	const effectiveBackend = recipeConfig.bibtexEnabled ? detectedBackend : recipeConfig.biblioBackend;
-
-	// Ensure biber WASM assets are available if biber backend is selected
-	if (effectiveBackend === "biber") {
-		const assetManager = new AssetManager(compiler.extensionContext);
-		const biberReady = await assetManager.ensureBiber();
-		if (!biberReady) {
-			onStatusChange?.("error");
-			await showAssetDownloadError("Biber WASM assets are not available.");
-			return;
-		}
-	}
 
 	// Pre-scan for packages and download missing ones ones
 	let extraFiles: { targetPath: string; content: Uint8Array }[] = [];

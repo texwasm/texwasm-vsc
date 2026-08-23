@@ -74,7 +74,7 @@ export function resolveBiberPath(
  * the assets downloaded into globalStorage.
  */
 export function resolveBiberDir(context: vscode.ExtensionContext): string {
-	if (fs.existsSync(path.join(getExtensionBiberDir(context), "biber_wasm.js"))) {
+	if (fs.existsSync(path.join(getExtensionBiberDir(context), "biber.js"))) {
 		return getExtensionBiberDir(context);
 	}
 	return getBiberDir(context);

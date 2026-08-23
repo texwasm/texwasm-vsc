@@ -1,4 +1,3 @@
 {
-	"engineBaseUrl": "https://github.com/texwasm/texlyre-busytex-mirror/releases/download/2026-08-13",
-	"biber": "https://github.com/TeXWASM/TeXWASM-biber/releases/download/1.0.0/biber-1.0.0-wasm.tar.gz"
+	"baseUrl": "https://github.com/texwasm/texlyre-busytex-mirror/releases/download/2026-08-22"
 }

@@ -141,7 +141,7 @@ With auto-build disabled, LaTeX Workshop won't attempt to compile, and **TeXWASM
 ## Limitations
 
 - **No shell-escape** — `minted`, `gnuplot`, and similar packages are not supported
-- **Biber** — biber support is available but has partial biblatex support (complex styles may not work fully; use `backend=bibtex` in biblatex options for full compatibility)
+- **Biber** — biber runs as the full Perl biber compiled to WASM (from TeXlyre's busytex build), giving complete biblatex support
 - **Fontspec** — BusyTeX's WASM engine has no `fontconfig`, so family names must be resolved to filenames. TeXWASM does this automatically by reading the font name tables of every `.ttf`/`.otf` installed on your OS (`C:\Windows\Fonts`, `/usr/share/fonts`, `/Library/Fonts`, etc.) and rewriting `\setmainfont{Arial}` to `\setmainfont[Path=...,Extension=.ttf]{arial}` before sending the source to the engine. The referenced font is then mounted from disk into the WASM virtual filesystem. The first compile after installation performs a one-time scan (~5–15 s) and caches the index in extension storage; subsequent compiles are instant. If a family name cannot be found, it is left untouched and `fontspec` will report a missing-file error in the log. Add extra search paths via `texwasm.systemFontDirectories` or run `TeXWASM: Rebuild System Font Index` after installing new fonts.
 - **TrueType Collections (.ttc)** — `fontspec` cannot address a single face inside a `.ttc` using `Path=`/`Extension=`, so multi-face collections are skipped during indexing. Use a standalone `.ttf`/`.otf` instead.
 - **Asset size** — first download is 100–500MB; subsequent compiles use a local cache

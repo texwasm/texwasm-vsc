@@ -128,8 +128,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			async () => {
 				const assetManager = new AssetManager(context);
 				const result = await assetManager.ensureAssets();
-				const biberResult = await assetManager.ensureBiber();
-				if (result && biberResult) {
+				if (result) {
 					vscode.window.showInformationMessage("TeXWASM: Engine assets ready.");
 				} else {
 					await showAssetDownloadError(

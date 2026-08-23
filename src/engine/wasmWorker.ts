@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import * as url from "node:url";
 import { parentPort } from "node:worker_threads";
 import type {
 	WorkerCompileRequest,
@@ -14,16 +13,14 @@ type WorkerRequest =
 	| WorkerInitRequest
 	| WorkerCompileRequest
 	| WorkerDocstripRequest;
-type BiberModule = {
-	process_biber: (bcf: string, bibs: [string, string][], opts: object) => string;
-	version: () => string;
-};
+// biome-ignore lint/suspicious/noExplicitAny: Emscripten Module factory signature is untyped
+type BiberFactory = (moduleArg: any) => Promise<any>;
 
 let assetsDirGlobal = "";
 let includeExtraBundleGlobal = false;
 // biome-ignore lint/suspicious/noExplicitAny: Emscripten Module factory signature is untyped
 let cachedModuleFactory: ((opts: any) => Promise<any>) | null = null;
-let biberModuleGlobal: BiberModule | null = null;
+let biberFactoryGlobal: BiberFactory | null = null;
 let biberAssetsDirGlobal = "";
 
 // biome-ignore lint/suspicious/noExplicitAny: Return type is dynamic parsed JSON
@@ -99,15 +96,16 @@ async function createModule(): Promise<EmscriptenModule> {
 	return M;
 }
 
-async function loadBiberModule(): Promise<BiberModule> {
-	if (biberModuleGlobal) return biberModuleGlobal;
-	const biberJsPath = path.join(biberAssetsDirGlobal, "biber_wasm.js");
+async function loadBiberFactory(): Promise<BiberFactory> {
+	if (biberFactoryGlobal) return biberFactoryGlobal;
+	const biberJsPath = path.join(biberAssetsDirGlobal, "biber.js");
 	if (!fs.existsSync(biberJsPath)) {
-		throw new Error(`biber_wasm.js not found in ${biberAssetsDirGlobal}`);
+		throw new Error(`biber.js not found in ${biberAssetsDirGlobal}`);
 	}
-	const mod = await import(url.pathToFileURL(biberJsPath).href) as BiberModule;
-	biberModuleGlobal = mod;
-	return biberModuleGlobal;
+	// biber.js is an Emscripten MODULARIZE factory (CommonJS export).
+	const mod = require(biberJsPath) as BiberFactory | { default: BiberFactory };
+	biberFactoryGlobal = (mod as { default?: BiberFactory }).default ?? (mod as BiberFactory);
+	return biberFactoryGlobal;
 }
 
 /** Create a directory and all missing parents (Emscripten's FS.mkdir is single-level). */
@@ -323,7 +321,7 @@ async function runBiber(
 ): Promise<boolean> {
 	const projectDir = "/project";
 	try {
-		const mod = await loadBiberModule();
+		const factory = await loadBiberFactory();
 		const bcfPath = path.posix.join(projectDir, texName.replace(/\.tex$/i, ".bcf"));
 		let bcfContent = "";
 		try {
@@ -340,11 +338,80 @@ async function runBiber(
 			console.error(`[TeXWASM] Biber: no .bib files available to process ${bcfPath}`);
 			return false;
 		}
-		const bibEntries: [string, string][] = bibFiles.map((b) => [
-			b.name,
-			b.content,
-		]);
-		const bblOutput = mod.process_biber(bcfContent, bibEntries, {});
+
+		// biber is a Perl interpreter compiled to WASM. It tears down its
+		// interpreter on exit, so every run gets a fresh instance.
+		const output: string[] = [];
+		const mod = await factory({
+			noInitialRun: true,
+			locateFile: (file: string) => {
+				if (file.endsWith(".wasm")) {
+					return path.join(biberAssetsDirGlobal, "biber.wasm");
+				}
+				if (file.endsWith(".data")) {
+					return path.join(biberAssetsDirGlobal, "biber.data");
+				}
+				return file;
+			},
+			print: (text: string) => {
+				output.push(text);
+				sendLog(text);
+			},
+			printErr: (text: string) => {
+				output.push(text);
+				sendLog(text);
+			},
+		});
+
+		const BFS = mod.FS;
+		// biber resolves datasources relative to the control file, so the .bcf
+		// and all .bib files are written into one directory, keeping their
+		// project-relative layout.
+		const workDir = "/home/web_user/biber";
+		const bcfName = path.posix.basename(bcfPath);
+		const bblName = bcfName.replace(/\.bcf$/i, ".bbl");
+
+		BFS.chdir(workDir);
+		BFS.writeFile(path.posix.join(workDir, bcfName), bcfContent);
+		for (const bib of bibFiles) {
+			const relPath = path.posix.normalize(bib.name);
+			const dir = path.posix.dirname(relPath);
+			if (dir && dir !== ".") {
+				mkdirTree(mod, path.posix.join(workDir, dir));
+			}
+			BFS.writeFile(path.posix.join(workDir, relPath), bib.content);
+		}
+
+		let exitCode = 0;
+		try {
+			exitCode = mod.callMain([
+				"/opt/perl-wasm/bin/biber",
+				"--output-format=bbl",
+				`--outfile=${bblName}`,
+				"--nolog",
+				bcfName,
+			]);
+		} catch (err) {
+			exitCode =
+				typeof err === "object" && err !== null && "status" in err &&
+				typeof (err as { status: unknown }).status === "number"
+					? ((err as { status: number }).status)
+					: 1;
+		}
+		if (exitCode !== 0) {
+			console.error(
+				`[TeXWASM] Biber failed (exit code ${exitCode})\n${output.join("\n")}`,
+			);
+			return false;
+		}
+
+		const bblFull = path.posix.join(workDir, bblName);
+		let bblOutput: string | null = null;
+		try {
+			if (BFS.analyzePath(bblFull).exists) {
+				bblOutput = BFS.readFile(bblFull, { encoding: "utf8" });
+			}
+		} catch {}
 		if (!bblOutput) {
 			console.error(`[TeXWASM] Biber returned empty .bbl for ${bcfPath}`);
 			return false;

@@ -41,15 +41,14 @@ jobs:
 
       - name: Download WASM assets
         run: |
-          ASSET_BASE_URL="$(node -p "require('./src/cache/assetUrls.json').engineBaseUrl")"
-          BIBER_URL="$(node -p "require('./src/cache/assetUrls.json').biber")"
-          mkdir -p assets/busytex
+          ASSET_BASE_URL="$(node -p "require('./src/cache/assetUrls.json').baseUrl")"
+          mkdir -p assets/busytex assets/biber
           for f in busytex.js busytex.wasm texlive-basic.js texlive-basic.data texlive-extra.js texlive-extra.data; do
             curl -fL "$ASSET_BASE_URL/$f" -o "assets/busytex/$f"
           done
-          curl -fL "$BIBER_URL" -o /tmp/biber.tar.gz
-          mkdir -p assets/biber
-          tar -xzf /tmp/biber.tar.gz -C assets/biber
+          for f in biber.js biber.wasm biber.data; do
+            curl -fL "$ASSET_BASE_URL/$f" -o "assets/biber/$f"
+          done
 
       - name: Package extension (with assets)
         run: |
