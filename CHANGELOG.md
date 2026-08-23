@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-23
+
 ### Changed
 
 - Biber backend now uses the full Perl biber (from TeXlyre's busytex build) compiled to WASM, replacing the previous Rust port. As of the original release date on August 09, there was no support for biber in TeXlyre-BusyTeX. This provides complete biblatex support. The biber assets are downloaded from the TeXlyre release referenced in `src/cache/assetUrls.json` (`biber.js`, `biber.wasm`, `biber.data`).
