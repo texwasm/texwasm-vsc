@@ -316,7 +316,7 @@
     "clean": "rimraf dist .vscode-test"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.8",
+    "@biomejs/biome": "2.5.11",
     "@types/adm-zip": "0.5.8",
     "@types/mocha": "10.0.10",
     "@types/node": "26.2.0",
