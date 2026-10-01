@@ -331,7 +331,7 @@
     "typescript": "7.0.2"
   },
   "dependencies": {
-    "adm-zip": "0.6.0",
+    "adm-zip": "0.6.1",
     "tar": "7.5.22"
   }
 }
