@@ -317,7 +317,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
-    "@types/adm-zip": "0.5.8",
+    "@types/adm-zip": "0.6.0",
     "@types/mocha": "10.0.10",
     "@types/node": "26.6.6",
     "@types/vscode": "1.96.0",
