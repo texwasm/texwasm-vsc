@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-02
+
+### Changed
+
+- Dependency updates: `@biomejs/biome` 2.6.4, `@vscode/vsce` 4.1.0, `mocha` 12.0.3, `glob` 14.0.3, `@types/node` 26.6.6, `@types/adm-zip` 0.6.0, `adm-zip` 0.6.1.
+
 ## [0.6.0] - 2026-08-23
 
 ### Changed
